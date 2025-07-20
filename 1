@@ -14,7 +14,6 @@ local moduleNameLabel
 local slashLabel
 
 
--- API система
 local API = {
 	modules = {},
 	settings = {},
@@ -30,15 +29,14 @@ function API:registerSettings(moduleName, settingsTable)
 	self.settings[moduleName] = {settings = settingsTable}
 end
 
--- Для совместимости со старым кодом
 local moduleSystem = {
 	activeCategory = nil,
 	activeModule = nil,
 	activeModuleName = nil,
-	modules = API.modules -- Связываем с API
+	modules = API.modules
 }
 
-local moduleSettings = API.settings -- Связываем с API
+local moduleSettings = API.settings
 
 local function tweenColor(object, property, targetColor, duration)
 	local tweenInfo = TweenInfo.new(
@@ -74,7 +72,6 @@ local function tweenSize(object, property, targetSize, duration)
 end
 
 
--- Создание слайдера, не трогать ебнет!
 local function createSlider(parent, setting, position)
 	local frame = Instance.new("Frame")
 	frame.Size = UDim2.new(0, 600, 0, 120)
@@ -179,7 +176,6 @@ local function createSlider(parent, setting, position)
 	return frame
 end
 
--- Вроде пашет переключатель, сойдет
 local function createToggle(parent, setting, position)
 	local outerFrame = Instance.new("Frame")
 	outerFrame.Size = UDim2.new(0, 300, 0, 50)
@@ -230,7 +226,6 @@ local function createToggle(parent, setting, position)
 	switchTrack.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			isEnabled = not isEnabled
-			-- Тут происходит магия через твин сервисы и кривые анимации
 			if isEnabled then
 				switchCircle:TweenPosition(UDim2.new(1, -19, 0, 1), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
 				switchCircle.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
@@ -247,7 +242,6 @@ local function createToggle(parent, setting, position)
 	return outerFrame
 end
 
--- Шляпа Модульная, сеттинги показывает и уже хорошо
 local function showModuleSettings(parent, moduleName)
 	local settingsContainer = _G.mainFrame:FindFirstChild("SettingsContainer")
 
@@ -280,7 +274,6 @@ local function showModuleSettings(parent, moduleName)
 	for _, setting in ipairs(moduleSettings[moduleName].settings) do
 		if setting.type == "slider" then
 			local slider = createSlider(settingsContainer, setting, UDim2.new(0, 0, 0, yOffset))
-			-- Отступы сеттингов перед созданием новых
 			yOffset = yOffset + 30
 		elseif setting.type == "toggle" then
 			local toggle = createToggle(settingsContainer, setting, UDim2.new(0, 0, 0, yOffset))
@@ -336,7 +329,6 @@ local function createModuleButton(parent, moduleData)
 	clickDetector.ZIndex = 10
 	clickDetector.Parent = moduleButton
 
-	-- Анимация при наведении
 	clickDetector.MouseEnter:Connect(function()
 		if not moduleData.enabled then
 			tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(20, 20, 22), 0.15)
@@ -352,7 +344,6 @@ local function createModuleButton(parent, moduleData)
 	end)
 
 	clickDetector.MouseButton1Down:Connect(function()
-		-- Деактивация других модулей в этой категории
 		for _, otherButton in pairs(parent:GetChildren()) do
 			if otherButton:IsA("Frame") and otherButton ~= moduleButton then
 				local otherLine = otherButton:FindFirstChild("Frame")
@@ -367,7 +358,6 @@ local function createModuleButton(parent, moduleData)
 				end
 				tweenColor(otherButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
 
-				-- Обновление состояния через API или старую систему
 				local otherIndex = otherButton:GetAttribute("ModuleIndex")
 				if otherIndex then
 					if API.modules[moduleSystem.activeCategory] then
@@ -379,10 +369,8 @@ local function createModuleButton(parent, moduleData)
 			end
 		end
 
-		-- Переключение состояния
 		moduleData.enabled = not moduleData.enabled
 
-		-- Визуальные эффекты
 		if moduleData.enabled then
 			tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
 			tweenColor(moduleName, "TextColor3", Color3.fromRGB(255, 75, 75))
@@ -398,7 +386,6 @@ local function createModuleButton(parent, moduleData)
 				showModuleSettings(_G.mainFrame, moduleData.name)
 			end)
 
-			-- Вызов callback'а из API
 			if API.callbacks[moduleData.name] and API.callbacks[moduleData.name].onEnable then
 				pcall(API.callbacks[moduleData.name].onEnable)
 			end
@@ -428,19 +415,16 @@ local function createModuleButton(parent, moduleData)
 				end
 			end)
 
-			-- Вызов callback'а из API
 			if API.callbacks[moduleData.name] and API.callbacks[moduleData.name].onDisable then
 				pcall(API.callbacks[moduleData.name].onDisable)
 			end
 		end
 
-		-- Совместимость со старыми callback'ами
 		if moduleData.callback then
 			pcall(moduleData.callback, moduleData.enabled)
 		end
 	end)
 
-	-- Инициализация состояния
 	if moduleData.enabled then
 		moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
 		moduleName.TextColor3 = Color3.fromRGB(255, 75, 75)
@@ -484,7 +468,6 @@ local function updateModuleList(moduleFrame, categoryName)
 	end
 end
 
--- Создание фреймов для гуишки + вытянул весь скрипт 
 local function createUI()
 	local Players = game:GetService("Players")
 	local player = Players.LocalPlayer
@@ -518,7 +501,6 @@ local function createUI()
 		local delta = input.Position - dragStart
 		local position = UDim2.new(
 			startPos.X.Scale,
-			-- Я с дельта мув спидом перепутал и в первый раз написал ускорение вместо перетаскивания
 			math.floor(startPos.X.Offset + delta.X),
 			startPos.Y.Scale,
 			math.floor(startPos.Y.Offset + delta.Y)
@@ -548,7 +530,6 @@ local function createUI()
 		end
 	end)
 	
--- Все Фреймы гуишки и ативизации модулей
 	local categoryFrame = Instance.new("Frame")
 	categoryFrame.Size = UDim2.new(0, 75, 1, -6)
 	categoryFrame.Position = UDim2.new(0, 3, 0, 3)
@@ -716,7 +697,6 @@ local function createUI()
 	addCategory("http://www.roblox.com/asset/?id=124280107087786", "Other")
 	addCategory("http://www.roblox.com/asset/?id=109730932565942", "Farm")
 	
-	-- НЕ ПЕРЕМЕЩАТЬ!! ОН ПАШЕТ ЕЛИ ЕЛИ
 	local settingsContainer = Instance.new("Frame")
 	settingsContainer.Name = "SettingsContainer"
 	settingsContainer.Size = UDim2.new(0, 615, 1, -110)
@@ -735,7 +715,6 @@ end
 
 
 local function init(config)
-	-- Совместимость со старым кодом
 	if config and config.moduleSystem then
 		for k,v in pairs(config.moduleSystem) do
 			moduleSystem[k] = v
@@ -751,7 +730,6 @@ local function init(config)
 	createUI()
 end
 
--- Возвращаем API наружу
 return {
 	init = init,
 	api = API
