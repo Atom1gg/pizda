@@ -6,7 +6,6 @@ end
 
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
 
 _G.mainFrame = nil
 
@@ -38,114 +37,6 @@ local moduleSystem = {
 }
 
 local moduleSettings = API.settings
-
-local function CreateLoader(mainFrame)
-    local loaderFrame = Instance.new("Frame")
-    loaderFrame.Size = UDim2.new(0, 900, 0, 600) -- Фиксированный размер как у mainFrame
-    loaderFrame.Position = UDim2.new(0.5, -450, 0.5, -300) -- Центрирование
-    loaderFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    loaderFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
-    loaderFrame.BorderSizePixel = 0
-    loaderFrame.Parent = mainFrame.Parent
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = loaderFrame
-
-    -- Иконка с правильными размерами (как в финальном UI)
-    local umbrellaIcon = Instance.new("ImageLabel")
-    umbrellaIcon.Name = "LoaderIcon"
-    umbrellaIcon.Image = "http://www.roblox.com/asset/?id=95285379105237"
-    umbrellaIcon.Size = UDim2.new(0, 50, 0, 50) -- Фиксированный размер как в финале
-    umbrellaIcon.Position = UDim2.new(0.5, -25, 0.5, -25) -- Центрирование
-    umbrellaIcon.AnchorPoint = Vector2.new(0.5, 0.5)
-    umbrellaIcon.BackgroundTransparency = 1
-    umbrellaIcon.Parent = loaderFrame
-
-	local pulseConnection
-	local function startPulse()
-		local scale = 1
-		local direction = 0.01
-		pulseConnection = RunService.Heartbeat:Connect(function(delta)
-			scale = scale + direction * delta * 2
-			if scale > 1.1 then direction = -0.01 end
-			if scale < 0.9 then direction = 0.01 end
-			umbrellaIcon.Size = UDim2.new(0, 80 * scale, 0, 80 * scale)
-			umbrellaIcon.Position = UDim2.new(0.5, -40 * scale, 0.5, -40 * scale)
-		end)
-	end
-
-	local progressBar = Instance.new("Frame")
-	progressBar.Size = UDim2.new(0.6, 0, 0, 4)
-	progressBar.Position = UDim2.new(0.2, 0, 0.7, 0)
-	progressBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-	progressBar.BorderSizePixel = 0
-	progressBar.Parent = loaderFrame
-
-	local progressCorner = Instance.new("UICorner")
-	progressCorner.CornerRadius = UDim.new(1, 0)
-	progressCorner.Parent = progressBar
-
-	local progressFill = Instance.new("Frame")
-	progressFill.Size = UDim2.new(0, 0, 1, 0)
-	progressFill.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
-	progressFill.BorderSizePixel = 0
-	progressFill.Parent = progressBar
-
-	local fillCorner = Instance.new("UICorner")
-	fillCorner.CornerRadius = UDim.new(1, 0)
-	fillCorner.Parent = progressFill
-
-	return loaderFrame, umbrellaIcon, progressFill, startPulse, pulseConnection
-end
-
-local function PlayLoaderAnimation(loaderFrame, umbrellaIcon, progressFill, finalPosition, finalSize, startPulse, pulseConnection)
-    -- Начальное состояние
-    umbrellaIcon.Rotation = 0
-    umbrellaIcon.Size = UDim2.new(0, 80, 0, 80) -- Начальный размер больше
-    umbrellaIcon.Position = UDim2.new(0.5, -40, 0.5, -40) -- Центр экрана
-    progressFill.Size = UDim2.new(0, 0, 1, 0)
-    
-    -- Анимация (5 секунд)
-    local fillTween = TweenService:Create(
-        progressFill,
-        TweenInfo.new(5, Enum.EasingStyle.Quint),
-        {Size = UDim2.new(1, 0, 1, 0)}
-    )
-    fillTween:Play()
-    
-    -- Последовательность:
-    -- 1. Вращение и пульсация (3 сек)
-    -- 2. Уменьшение к финальному размеру (2 сек)
-    local sequence = {
-        TweenService:Create(umbrellaIcon, TweenInfo.new(3, Enum.EasingStyle.Quad), {Rotation = 720}),
-        TweenService:Create(umbrellaIcon, TweenInfo.new(2, Enum.EasingStyle.Back), {
-            Size = finalSize,
-            Position = finalPosition
-        })
-    }
-    
-    -- Запуск анимаций
-    for i, tween in ipairs(sequence) do
-        tween:Play()
-        if i == 1 then
-            tween.Completed:Wait()
-            if pulseConnection then pulseConnection:Disconnect() end
-        else
-            tween.Completed:Wait()
-        end
-    end
-    
-    -- Плавное исчезновение
-    local fadeOut = TweenService:Create(
-        loaderFrame,
-        TweenInfo.new(0.5),
-        {BackgroundTransparency = 1}
-    )
-    fadeOut:Play()
-    fadeOut.Completed:Wait()
-    loaderFrame:Destroy()
-end
 
 local function tweenColor(object, property, targetColor, duration)
 	local tweenInfo = TweenInfo.new(
@@ -590,244 +481,237 @@ local function createUI()
 	mainFrame.Position = UDim2.new(0.5, -450, 0.5, -300)
 	mainFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
 	mainFrame.BorderSizePixel = 0
-	mainFrame.Visible = false
 	mainFrame.Parent = screenGui
 
-	local loaderFrame, umbrellaIcon, progressFill, startPulse, pulseConnection = CreateLoader(mainFrame)
+	local mainCorner = Instance.new("UICorner")
+	mainCorner.CornerRadius = UDim.new(0, 8)
+	mainCorner.Parent = mainFrame
 
-	local finalPosition = UDim2.new(0.5, -435, 0.5, -290)
-	local finalSize = UDim2.new(0, 50, 0, 50)
+	local dragging = false
+	local dragStart
+	local startPos
 
-coroutine.wrap(function()
-    local finalPosition = UDim2.new(0, 65, 0, 10) -- Точная позиция из вашего UI
-    local finalSize = UDim2.new(0, 50, 0, 50) -- Точный размер из вашего UI
-    
-    PlayLoaderAnimation(loaderFrame, umbrellaIcon, progressFill, finalPosition, finalSize, startPulse, pulseConnection)
-    
-    mainFrame.Visible = true
-    
-    local UmbrellaIcon = Instance.new("ImageLabel")
-    UmbrellaIcon.Size = finalSize
-    UmbrellaIcon.Position = finalPosition
-    UmbrellaIcon.BackgroundTransparency = 1
-    UmbrellaIcon.Image = "http://www.roblox.com/asset/?id=95285379105237"
-    UmbrellaIcon.Parent = mainFrame
+	local topBar = Instance.new("Frame")
+	topBar.Size = UDim2.new(1, 0, 0, 60)
+	topBar.Position = UDim2.new(0, 0, 0, 0)
+	topBar.BackgroundTransparency = 1
+	topBar.Parent = mainFrame
 
-		local function updateDrag(input)
-			local delta = input.Position - dragStart
-			local position = UDim2.new(
-				startPos.X.Scale,
-				math.floor(startPos.X.Offset + delta.X),
-				startPos.Y.Scale,
-				math.floor(startPos.Y.Offset + delta.Y)
-			)
-			TweenService:Create(mainFrame, TweenInfo.new(0.1), {Position = position}):Play()
+	local function updateDrag(input)
+		local delta = input.Position - dragStart
+		local position = UDim2.new(
+			startPos.X.Scale,
+			math.floor(startPos.X.Offset + delta.X),
+			startPos.Y.Scale,
+			math.floor(startPos.Y.Offset + delta.Y)
+		)
+		TweenService:Create(mainFrame, TweenInfo.new(0.1), {Position = position}):Play()
+	end
+
+	topBar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+			dragStart = input.Position
+			startPos = mainFrame.Position
+
+			local connection
+			connection = UIS.InputEnded:Connect(function(inputEnd)
+				if inputEnd.UserInputType == Enum.UserInputType.MouseButton1 then
+					dragging = false
+					connection:Disconnect()
+				end
+			end)
 		end
+	end)
 
-		topBar.InputBegan:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 then
-				dragging = true
-				dragStart = input.Position
-				startPos = mainFrame.Position
+	UIS.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			updateDrag(input)
+		end
+	end)
+	
+	local categoryFrame = Instance.new("Frame")
+	categoryFrame.Size = UDim2.new(0, 75, 1, -6)
+	categoryFrame.Position = UDim2.new(0, 3, 0, 3)
+	categoryFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+	categoryFrame.BorderSizePixel = 0
+	categoryFrame.Parent = mainFrame
 
-				local connection
-				connection = UIS.InputEnded:Connect(function(inputEnd)
-					if inputEnd.UserInputType == Enum.UserInputType.MouseButton1 then
-						dragging = false
-						connection:Disconnect()
-					end
-				end)
+	local categoryList = Instance.new("ScrollingFrame")
+	categoryList.Size = UDim2.new(1, 0, 1, 0)
+	categoryList.Position = UDim2.new(0, 12, 0, 100)
+	categoryList.BackgroundTransparency = 1
+	categoryList.ScrollBarThickness = 0
+	categoryList.CanvasSize = UDim2.new(0, 0, 0, 500)
+	categoryList.Parent = categoryFrame
+
+	local categoryLayout = Instance.new("UIListLayout")
+	categoryLayout.Padding = UDim.new(0, 30)
+	categoryLayout.Parent = categoryList
+
+	local ModuleFrame = Instance.new("Frame")
+	ModuleFrame.Size = UDim2.new(0, 150, 1, -6)
+	ModuleFrame.Position = UDim2.new(0, 80, 0, 3)
+	ModuleFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+	ModuleFrame.BorderSizePixel = 0
+	ModuleFrame.Parent = mainFrame
+
+	local moduleList = Instance.new("ScrollingFrame")
+	moduleList.Size = UDim2.new(1, 0, 1, -50)
+	moduleList.Position = UDim2.new(0, 10, 0, 100)
+	moduleList.BackgroundTransparency = 1
+	moduleList.ScrollBarThickness = 0
+	moduleList.CanvasSize = UDim2.new(0, 0, 0, 500)
+	moduleList.Parent = ModuleFrame
+
+	local moduleLayout = Instance.new("UIListLayout")
+	moduleLayout.Padding = UDim.new(0, 10)
+	moduleLayout.Parent = moduleList
+
+	local activeCategory = nil
+
+	activeCategoryLabel = Instance.new("TextLabel")
+	activeCategoryLabel.Size = UDim2.new(0, 300, 0, 50)
+	activeCategoryLabel.Position = UDim2.new(0.5, -350, 0.5, -280)
+	activeCategoryLabel.BackgroundTransparency = 1
+	activeCategoryLabel.Text = ""
+	activeCategoryLabel.TextSize = 22
+	activeCategoryLabel.Font = Enum.Font.Gotham
+	activeCategoryLabel.TextColor3 = Color3.fromRGB(150, 153, 163)
+	activeCategoryLabel.TextXAlignment = Enum.TextXAlignment.Left
+	activeCategoryLabel.Parent = mainFrame
+
+	slashLabel = Instance.new("TextLabel")
+	slashLabel.Size = UDim2.new(0, 20, 0, 50)
+	slashLabel.Position = UDim2.new(0.5, -205, 0.5, -280)
+	slashLabel.BackgroundTransparency = 1
+	slashLabel.Text = "/"
+	slashLabel.TextSize = 22
+	slashLabel.Font = Enum.Font.Gotham
+	slashLabel.TextColor3 = Color3.fromRGB(150, 153, 163)
+	slashLabel.TextXAlignment = Enum.TextXAlignment.Left
+	slashLabel.Visible = false
+	slashLabel.Parent = mainFrame
+
+	moduleNameLabel = Instance.new("TextLabel")
+	moduleNameLabel.Size = UDim2.new(0, 300, 0, 50)
+	moduleNameLabel.Position = UDim2.new(0.5, -190, 0.5, -280)
+	moduleNameLabel.BackgroundTransparency = 1
+	moduleNameLabel.Text = ""
+	moduleNameLabel.TextSize = 22
+	moduleNameLabel.Font = Enum.Font.Gotham
+	moduleNameLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
+	moduleNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+	moduleNameLabel.Parent = mainFrame
+
+	local UmbrellaIcon = Instance.new("ImageLabel")
+	UmbrellaIcon.Size = UDim2.new(0, 50, 0, 50)
+	UmbrellaIcon.Position = UDim2.new(0.5, -435, 0.5, -290)
+	UmbrellaIcon.BackgroundTransparency = 1
+	UmbrellaIcon.Image = "http://www.roblox.com/asset/?id=95285379105237"
+	UmbrellaIcon.Parent = mainFrame
+	
+	local function addCategory(icon, name)
+		local categoryButton = Instance.new("Frame")
+		categoryButton.Size = UDim2.new(0, 50, 0, 50)
+		categoryButton.Position = UDim2.new(0, 5, 0, 5)
+		categoryButton.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+		categoryButton.BorderSizePixel = 0
+		categoryButton.Parent = categoryList
+
+		local categoryCorner = Instance.new("UICorner")
+		categoryCorner.CornerRadius = UDim.new(0, 8)
+		categoryCorner.Parent = categoryButton
+
+		local iconImage = Instance.new("ImageLabel")
+		iconImage.Size = UDim2.new(0, 30, 0, 30)
+		iconImage.Position = UDim2.new(0.5, -15, 0.5, -15)
+		iconImage.BackgroundTransparency = 1
+		iconImage.Image = icon
+		iconImage.ImageColor3 = Color3.fromRGB(150, 150, 150)
+		iconImage.Parent = categoryButton
+
+		local redLine = Instance.new("Frame")
+		redLine.Size = UDim2.new(0, 2, 0, 0)
+		redLine.Position = UDim2.new(0, 0, 0.5, 0)
+		redLine.AnchorPoint = Vector2.new(0, 0.5)
+		redLine.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
+		redLine.Transparency = 1
+		redLine.Parent = categoryButton
+
+		local clickDetector = Instance.new("TextButton")
+		clickDetector.Size = UDim2.new(1, 0, 1, 0)
+		clickDetector.BackgroundTransparency = 1
+		clickDetector.Text = ""
+		clickDetector.Parent = categoryButton
+
+		clickDetector.MouseEnter:Connect(function()
+			if activeCategory ~= categoryButton then
+				tweenColor(iconImage, "ImageColor3", Color3.fromRGB(200, 200, 200), 0.15)
 			end
 		end)
 
-		UIS.InputChanged:Connect(function(input)
-			if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-				updateDrag(input)
+		clickDetector.MouseLeave:Connect(function()
+			if activeCategory ~= categoryButton then
+				tweenColor(iconImage, "ImageColor3", Color3.fromRGB(150, 150, 150), 0.15)
 			end
 		end)
 
-		local categoryFrame = Instance.new("Frame")
-		categoryFrame.Size = UDim2.new(0, 75, 1, -6)
-		categoryFrame.Position = UDim2.new(0, 3, 0, 3)
-		categoryFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-		categoryFrame.BorderSizePixel = 0
-		categoryFrame.Parent = mainFrame
+		clickDetector.MouseButton1Click:Connect(function()
+			if activeCategory == categoryButton then return end
 
-		local categoryList = Instance.new("ScrollingFrame")
-		categoryList.Size = UDim2.new(1, 0, 1, 0)
-		categoryList.Position = UDim2.new(0, 12, 0, 100)
-		categoryList.BackgroundTransparency = 1
-		categoryList.ScrollBarThickness = 0
-		categoryList.CanvasSize = UDim2.new(0, 0, 0, 500)
-		categoryList.Parent = categoryFrame
+			if activeCategory then
+				local prevIcon = activeCategory:FindFirstChild("ImageLabel")
+				local prevLine = activeCategory:FindFirstChild("Frame")
 
-		local categoryLayout = Instance.new("UIListLayout")
-		categoryLayout.Padding = UDim.new(0, 30)
-		categoryLayout.Parent = categoryList
-
-		local ModuleFrame = Instance.new("Frame")
-		ModuleFrame.Size = UDim2.new(0, 150, 1, -6)
-		ModuleFrame.Position = UDim2.new(0, 80, 0, 3)
-		ModuleFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-		ModuleFrame.BorderSizePixel = 0
-		ModuleFrame.Parent = mainFrame
-
-		local moduleList = Instance.new("ScrollingFrame")
-		moduleList.Size = UDim2.new(1, 0, 1, -50)
-		moduleList.Position = UDim2.new(0, 10, 0, 100)
-		moduleList.BackgroundTransparency = 1
-		moduleList.ScrollBarThickness = 0
-		moduleList.CanvasSize = UDim2.new(0, 0, 0, 500)
-		moduleList.Parent = ModuleFrame
-
-		local moduleLayout = Instance.new("UIListLayout")
-		moduleLayout.Padding = UDim.new(0, 10)
-		moduleLayout.Parent = moduleList
-
-		local activeCategory = nil
-
-		activeCategoryLabel = Instance.new("TextLabel")
-		activeCategoryLabel.Size = UDim2.new(0, 300, 0, 50)
-		activeCategoryLabel.Position = UDim2.new(0.5, -350, 0.5, -280)
-		activeCategoryLabel.BackgroundTransparency = 1
-		activeCategoryLabel.Text = ""
-		activeCategoryLabel.TextSize = 22
-		activeCategoryLabel.Font = Enum.Font.Gotham
-		activeCategoryLabel.TextColor3 = Color3.fromRGB(150, 153, 163)
-		activeCategoryLabel.TextXAlignment = Enum.TextXAlignment.Left
-		activeCategoryLabel.Parent = mainFrame
-
-		slashLabel = Instance.new("TextLabel")
-		slashLabel.Size = UDim2.new(0, 20, 0, 50)
-		slashLabel.Position = UDim2.new(0.5, -205, 0.5, -280)
-		slashLabel.BackgroundTransparency = 1
-		slashLabel.Text = "/"
-		slashLabel.TextSize = 22
-		slashLabel.Font = Enum.Font.Gotham
-		slashLabel.TextColor3 = Color3.fromRGB(150, 153, 163)
-		slashLabel.TextXAlignment = Enum.TextXAlignment.Left
-		slashLabel.Visible = false
-		slashLabel.Parent = mainFrame
-
-		moduleNameLabel = Instance.new("TextLabel")
-		moduleNameLabel.Size = UDim2.new(0, 300, 0, 50)
-		moduleNameLabel.Position = UDim2.new(0.5, -190, 0.5, -280)
-		moduleNameLabel.BackgroundTransparency = 1
-		moduleNameLabel.Text = ""
-		moduleNameLabel.TextSize = 22
-		moduleNameLabel.Font = Enum.Font.Gotham
-		moduleNameLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
-		moduleNameLabel.TextXAlignment = Enum.TextXAlignment.Left
-		moduleNameLabel.Parent = mainFrame
-
-		local UmbrellaIcon = Instance.new("ImageLabel")
-		UmbrellaIcon.Size = UDim2.new(0, 50, 0, 50)
-		UmbrellaIcon.Position = UDim2.new(0.5, -435, 0.5, -290)
-		UmbrellaIcon.BackgroundTransparency = 1
-		UmbrellaIcon.Image = "http://www.roblox.com/asset/?id=95285379105237"
-		UmbrellaIcon.Parent = mainFrame
-
-		local function addCategory(icon, name)
-			local categoryButton = Instance.new("Frame")
-			categoryButton.Size = UDim2.new(0, 50, 0, 50)
-			categoryButton.Position = UDim2.new(0, 5, 0, 5)
-			categoryButton.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-			categoryButton.BorderSizePixel = 0
-			categoryButton.Parent = categoryList
-
-			local categoryCorner = Instance.new("UICorner")
-			categoryCorner.CornerRadius = UDim.new(0, 8)
-			categoryCorner.Parent = categoryButton
-
-			local iconImage = Instance.new("ImageLabel")
-			iconImage.Size = UDim2.new(0, 30, 0, 30)
-			iconImage.Position = UDim2.new(0.5, -15, 0.5, -15)
-			iconImage.BackgroundTransparency = 1
-			iconImage.Image = icon
-			iconImage.ImageColor3 = Color3.fromRGB(150, 150, 150)
-			iconImage.Parent = categoryButton
-
-			local redLine = Instance.new("Frame")
-			redLine.Size = UDim2.new(0, 2, 0, 0)
-			redLine.Position = UDim2.new(0, 0, 0.5, 0)
-			redLine.AnchorPoint = Vector2.new(0, 0.5)
-			redLine.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
-			redLine.Transparency = 1
-			redLine.Parent = categoryButton
-
-			local clickDetector = Instance.new("TextButton")
-			clickDetector.Size = UDim2.new(1, 0, 1, 0)
-			clickDetector.BackgroundTransparency = 1
-			clickDetector.Text = ""
-			clickDetector.Parent = categoryButton
-
-			clickDetector.MouseEnter:Connect(function()
-				if activeCategory ~= categoryButton then
-					tweenColor(iconImage, "ImageColor3", Color3.fromRGB(200, 200, 200), 0.15)
+				if prevIcon then
+					tweenColor(prevIcon, "ImageColor3", Color3.fromRGB(150, 150, 150))
 				end
-			end)
-
-			clickDetector.MouseLeave:Connect(function()
-				if activeCategory ~= categoryButton then
-					tweenColor(iconImage, "ImageColor3", Color3.fromRGB(150, 150, 150), 0.15)
+				if prevLine then
+					tweenTransparency(prevLine, "Transparency", 1)
+					tweenSize(prevLine, "Size", UDim2.new(0, 2, 0, 0))
 				end
-			end)
+				tweenColor(activeCategory, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
+			end
 
-			clickDetector.MouseButton1Click:Connect(function()
-				if activeCategory == categoryButton then return end
+			activeCategory = categoryButton
+			moduleSystem.activeCategory = name
 
-				if activeCategory then
-					local prevIcon = activeCategory:FindFirstChild("ImageLabel")
-					local prevLine = activeCategory:FindFirstChild("Frame")
+			tweenColor(categoryButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
+			tweenColor(iconImage, "ImageColor3", Color3.fromRGB(255, 75, 75))
 
-					if prevIcon then
-						tweenColor(prevIcon, "ImageColor3", Color3.fromRGB(150, 150, 150))
-					end
-					if prevLine then
-						tweenTransparency(prevLine, "Transparency", 1)
-						tweenSize(prevLine, "Size", UDim2.new(0, 2, 0, 0))
-					end
-					tweenColor(activeCategory, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
-				end
+			redLine.Transparency = 0
+			tweenSize(redLine, "Size", UDim2.new(0, 2, 0, 20))
 
-				activeCategory = categoryButton
-				moduleSystem.activeCategory = name
+			activeCategoryLabel.Text = name
+			slashLabel.Visible = false
+			moduleNameLabel.Text = ""
 
-				tweenColor(categoryButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
-				tweenColor(iconImage, "ImageColor3", Color3.fromRGB(255, 75, 75))
+			updateModuleList(moduleList, name)
+		end)
+	end
 
-				redLine.Transparency = 0
-				tweenSize(redLine, "Size", UDim2.new(0, 2, 0, 20))
+	addCategory("http://www.roblox.com/asset/?id=103577523623326", "Test")
+	addCategory("http://www.roblox.com/asset/?id=136613041915472", "World")
+	addCategory("http://www.roblox.com/asset/?id=85568792810849", "Player")
+	addCategory("http://www.roblox.com/asset/?id=124280107087786", "Other")
+	addCategory("http://www.roblox.com/asset/?id=109730932565942", "Farm")
+	
+	local settingsContainer = Instance.new("Frame")
+	settingsContainer.Name = "SettingsContainer"
+	settingsContainer.Size = UDim2.new(0, 615, 1, -110)
+	settingsContainer.Position = UDim2.new(0, 257, 0, 90)
+	settingsContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+	settingsContainer.BackgroundTransparency = 1
+	settingsContainer.Parent = mainFrame
 
-				activeCategoryLabel.Text = name
-				slashLabel.Visible = false
-				moduleNameLabel.Text = ""
+	local settingsCorner = Instance.new("UICorner")
+	settingsCorner.CornerRadius = UDim.new(0, 8)
+	settingsCorner.Parent = settingsContainer
 
-				updateModuleList(moduleList, name)
-			end)
-		end
-
-		addCategory("http://www.roblox.com/asset/?id=103577523623326", "Test")
-		addCategory("http://www.roblox.com/asset/?id=136613041915472", "World")
-		addCategory("http://www.roblox.com/asset/?id=85568792810849", "Player")
-		addCategory("http://www.roblox.com/asset/?id=124280107087786", "Other")
-		addCategory("http://www.roblox.com/asset/?id=109730932565942", "Farm")
-
-		local settingsContainer = Instance.new("Frame")
-		settingsContainer.Name = "SettingsContainer"
-		settingsContainer.Size = UDim2.new(0, 615, 1, -110)
-		settingsContainer.Position = UDim2.new(0, 257, 0, 90)
-		settingsContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-		settingsContainer.BackgroundTransparency = 1
-		settingsContainer.Parent = mainFrame
-
-		local settingsCorner = Instance.new("UICorner")
-		settingsCorner.CornerRadius = UDim.new(0, 8)
-		settingsCorner.Parent = settingsContainer
-
-		_G.mainFrame = mainFrame
-	end)()
+	_G.mainFrame = mainFrame
 end
+
 
 
 local function init(config)
@@ -848,14 +732,5 @@ end
 
 return {
 	init = init,
-	api = API,
-	showLoader = function() 
-		if _G.mainFrame then 
-			local loaderFrame, umbrellaIcon, progressFill, startPulse, pulseConnection = CreateLoader(_G.mainFrame)
-			PlayLoaderAnimation(loaderFrame, umbrellaIcon, progressFill, 
-				UDim2.new(0.5, -435, 0.5, -290), 
-				UDim2.new(0, 50, 0, 50), 
-				startPulse, pulseConnection)
-		end
-	end
+	api = API
 }
