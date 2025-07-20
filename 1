@@ -40,25 +40,27 @@ local moduleSystem = {
 local moduleSettings = API.settings
 
 local function CreateLoader(mainFrame)
-	local loaderFrame = Instance.new("Frame")
-	loaderFrame.Size = mainFrame.Size
-	loaderFrame.Position = mainFrame.Position
-	loaderFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
-	loaderFrame.BorderSizePixel = 0
-	loaderFrame.Parent = mainFrame.Parent
+    local loaderFrame = Instance.new("Frame")
+    loaderFrame.Size = UDim2.new(0, 900, 0, 600) -- Фиксированный размер как у mainFrame
+    loaderFrame.Position = UDim2.new(0.5, -450, 0.5, -300) -- Центрирование
+    loaderFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    loaderFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
+    loaderFrame.BorderSizePixel = 0
+    loaderFrame.Parent = mainFrame.Parent
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = loaderFrame
 
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = loaderFrame
-
-	local umbrellaIcon = Instance.new("ImageLabel")
-	umbrellaIcon.Name = "LoaderIcon"
-	umbrellaIcon.Image = "http://www.roblox.com/asset/?id=95285379105237"
-	umbrellaIcon.Size = UDim2.new(0, 80, 0, 80)
-	umbrellaIcon.Position = UDim2.new(0.5, -40, 0.5, -40)
-	umbrellaIcon.AnchorPoint = Vector2.new(0.5, 0.5)
-	umbrellaIcon.BackgroundTransparency = 1
-	umbrellaIcon.Parent = loaderFrame
+    -- Иконка с правильными размерами (как в финальном UI)
+    local umbrellaIcon = Instance.new("ImageLabel")
+    umbrellaIcon.Name = "LoaderIcon"
+    umbrellaIcon.Image = "http://www.roblox.com/asset/?id=95285379105237"
+    umbrellaIcon.Size = UDim2.new(0, 50, 0, 50) -- Фиксированный размер как в финале
+    umbrellaIcon.Position = UDim2.new(0.5, -25, 0.5, -25) -- Центрирование
+    umbrellaIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+    umbrellaIcon.BackgroundTransparency = 1
+    umbrellaIcon.Parent = loaderFrame
 
 	local pulseConnection
 	local function startPulse()
@@ -98,47 +100,51 @@ local function CreateLoader(mainFrame)
 end
 
 local function PlayLoaderAnimation(loaderFrame, umbrellaIcon, progressFill, finalPosition, finalSize, startPulse, pulseConnection)
-	umbrellaIcon.Rotation = 0
-	progressFill.Size = UDim2.new(0, 0, 1, 0)
-
-	startPulse()
-
-	local fillTween = TweenService:Create(
-		progressFill,
-		TweenInfo.new(5, Enum.EasingStyle.Quint),
-		{Size = UDim2.new(1, 0, 1, 0)}
-	)
-	fillTween:Play()
-
-	local sequence = {
-		TweenService:Create(umbrellaIcon, TweenInfo.new(3, Enum.EasingStyle.Quad), {Rotation = 720}),
-
-		TweenService:Create(umbrellaIcon, TweenInfo.new(2, Enum.EasingStyle.Back), {Size = UDim2.new(0, 100, 0, 100)}),
-
-		TweenService:Create(umbrellaIcon, TweenInfo.new(0.7, Enum.EasingStyle.Quad), {
-			Position = finalPosition,
-			Size = finalSize
-		})
-	}
-
-	for i, tween in ipairs(sequence) do
-		tween:Play()
-		if i == 1 then
-			tween.Completed:Wait()
-			if pulseConnection then pulseConnection:Disconnect() end
-		else
-			tween.Completed:Wait()
-		end
-	end
-
-	local fadeOut = TweenService:Create(
-		loaderFrame,
-		TweenInfo.new(0.5),
-		{BackgroundTransparency = 1}
-	)
-	fadeOut:Play()
-	fadeOut.Completed:Wait()
-	loaderFrame:Destroy()
+    -- Начальное состояние
+    umbrellaIcon.Rotation = 0
+    umbrellaIcon.Size = UDim2.new(0, 80, 0, 80) -- Начальный размер больше
+    umbrellaIcon.Position = UDim2.new(0.5, -40, 0.5, -40) -- Центр экрана
+    progressFill.Size = UDim2.new(0, 0, 1, 0)
+    
+    -- Анимация (5 секунд)
+    local fillTween = TweenService:Create(
+        progressFill,
+        TweenInfo.new(5, Enum.EasingStyle.Quint),
+        {Size = UDim2.new(1, 0, 1, 0)}
+    )
+    fillTween:Play()
+    
+    -- Последовательность:
+    -- 1. Вращение и пульсация (3 сек)
+    -- 2. Уменьшение к финальному размеру (2 сек)
+    local sequence = {
+        TweenService:Create(umbrellaIcon, TweenInfo.new(3, Enum.EasingStyle.Quad), {Rotation = 720}),
+        TweenService:Create(umbrellaIcon, TweenInfo.new(2, Enum.EasingStyle.Back), {
+            Size = finalSize,
+            Position = finalPosition
+        })
+    }
+    
+    -- Запуск анимаций
+    for i, tween in ipairs(sequence) do
+        tween:Play()
+        if i == 1 then
+            tween.Completed:Wait()
+            if pulseConnection then pulseConnection:Disconnect() end
+        else
+            tween.Completed:Wait()
+        end
+    end
+    
+    -- Плавное исчезновение
+    local fadeOut = TweenService:Create(
+        loaderFrame,
+        TweenInfo.new(0.5),
+        {BackgroundTransparency = 1}
+    )
+    fadeOut:Play()
+    fadeOut.Completed:Wait()
+    loaderFrame:Destroy()
 end
 
 local function tweenColor(object, property, targetColor, duration)
@@ -592,25 +598,20 @@ local function createUI()
 	local finalPosition = UDim2.new(0.5, -435, 0.5, -290)
 	local finalSize = UDim2.new(0, 50, 0, 50)
 
-	coroutine.wrap(function()
-		PlayLoaderAnimation(loaderFrame, umbrellaIcon, progressFill, finalPosition, finalSize, startPulse, pulseConnection)
-
-		mainFrame.Visible = true
-
-
-		local mainCorner = Instance.new("UICorner")
-		mainCorner.CornerRadius = UDim.new(0, 8)
-		mainCorner.Parent = mainFrame
-
-		local dragging = false
-		local dragStart
-		local startPos
-
-		local topBar = Instance.new("Frame")
-		topBar.Size = UDim2.new(1, 0, 0, 60)
-		topBar.Position = UDim2.new(0, 0, 0, 0)
-		topBar.BackgroundTransparency = 1
-		topBar.Parent = mainFrame
+coroutine.wrap(function()
+    local finalPosition = UDim2.new(0, 65, 0, 10) -- Точная позиция из вашего UI
+    local finalSize = UDim2.new(0, 50, 0, 50) -- Точный размер из вашего UI
+    
+    PlayLoaderAnimation(loaderFrame, umbrellaIcon, progressFill, finalPosition, finalSize, startPulse, pulseConnection)
+    
+    mainFrame.Visible = true
+    
+    local UmbrellaIcon = Instance.new("ImageLabel")
+    UmbrellaIcon.Size = finalSize
+    UmbrellaIcon.Position = finalPosition
+    UmbrellaIcon.BackgroundTransparency = 1
+    UmbrellaIcon.Image = "http://www.roblox.com/asset/?id=95285379105237"
+    UmbrellaIcon.Parent = mainFrame
 
 		local function updateDrag(input)
 			local delta = input.Position - dragStart
