@@ -1,0 +1,84 @@
+-- // Valiant ENV (Fixed)
+getgenv().Valiant = {
+    Services = {},
+    Exploit = "Unknown"
+}
+
+-- // Only essential Roblox services
+local EssentialServices = {
+    "Workspace",
+    "Players",
+    "ReplicatedStorage",
+    "RunService",
+    "UserInputService",
+    "HttpService",
+    "Lighting",
+    "SoundService",
+    "GuiService",
+    "MarketplaceService",
+    "StarterGui",
+    "StarterPack",
+    "CoreGui",
+    "Debris",
+    "Teams"
+}
+
+-- // Supported exploits
+local ExploitCheckList = {
+    syn = "Synapse",
+    PROTOSMASHER_LOADED = "ProtoSmasher",
+    SENTINEL_LOADED = "Sentinel",
+    Sirhurt = "Sirhurt",
+    isexecutorclosure = "Script-Ware"
+}
+
+-- // Load services with error handling
+for _, serviceName in pairs(EssentialServices) do
+    local success, service = pcall(game.GetService, game, serviceName)
+    if success then
+        Valiant.Services[serviceName] = service
+        getgenv()[serviceName:gsub(" ", "")] = service -- Backward compatibility
+    end
+end
+
+-- // Detect exploit
+for exploitFlag, name in pairs(ExploitCheckList) do
+    if getgenv()[exploitFlag] then
+        Valiant.Exploit = name
+        break
+    end
+end
+
+-- // Core functions backup
+local mt = getrawmetatable(game)
+if mt then
+    setreadonly(mt, false)
+    Valiant.Original = {
+        Namecall = mt.__namecall,
+        Newindex = mt.__newindex,
+        Index = mt.__index
+    }
+end
+
+-- // Environment functions (safe fallbacks)
+local function SafeGetEnvFunction(name, default)
+    return getgenv()[name] or default or function() end
+end
+
+-- // Essential exploit functions
+getgenv().queueonteleport = SafeGetEnvFunction("queue_on_teleport") or queue_on_teleport or function() end
+getgenv().getrawmetatable = SafeGetEnvFunction("getrawmetatable", getrawmetatable)
+getgenv().setreadonly = SafeGetEnvFunction("setreadonly", setreadonly)
+getgenv().newcclosure = SafeGetEnvFunction("newcclosure", newcclosure or function(f) return f end)
+getgenv().hookfunction = SafeGetEnvFunction("hookfunction", hookfunction)
+getgenv().checkcaller = SafeGetEnvFunction("checkcaller", checkcaller)
+getgenv().getnamecallmethod = SafeGetEnvFunction("getnamecallmethod", getnamecallmethod)
+
+-- // Backward compatibility
+if not getgenv().getgenv then
+    getgenv().getgenv = function() return getgenv() end
+end
+
+if not getgenv().getrenv then
+    getgenv().getrenv = function() return getfenv() end
+end
