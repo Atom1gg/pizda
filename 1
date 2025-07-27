@@ -71,6 +71,256 @@ local function tweenSize(object, property, targetSize, duration)
 	return tween
 end
 
+local function createDropDown(parent, setting, position)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 600, 0, 60)
+    frame.Position = position
+    frame.BackgroundTransparency = 1
+    frame.ClipsDescendants = true
+    frame.Parent = parent
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0.5, 0)
+    label.Position = UDim2.new(0, 15, 0, 0)
+    label.Text = setting.name
+    label.TextColor3 = Color3.fromRGB(142, 142, 142)
+    label.Font = Enum.Font.SourceSansBold
+    label.TextSize = 22
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.BackgroundTransparency = 1
+    label.Parent = frame
+
+    local dropDownButton = Instance.new("TextButton")
+    dropDownButton.Size = UDim2.new(1, -30, 0, 30)
+    dropDownButton.Position = UDim2.new(0, 15, 0.5, 0)
+    dropDownButton.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
+    dropDownButton.BorderSizePixel = 0
+    dropDownButton.AutoButtonColor = false
+    dropDownButton.Text = ""
+    dropDownButton.Parent = frame
+
+    local dropDownCorner = Instance.new("UICorner")
+    dropDownCorner.CornerRadius = UDim.new(0, 4)
+    dropDownCorner.Parent = dropDownButton
+
+    local selectedText = Instance.new("TextLabel")
+    selectedText.Size = UDim2.new(1, -30, 1, 0)
+    selectedText.Position = UDim2.new(0, 10, 0, 0)
+    selectedText.BackgroundTransparency = 1
+    selectedText.Text = setting.default and (setting.multiSelect and table.concat(setting.default, ", ") or setting.default) or "Select..."
+    selectedText.TextColor3 = Color3.fromRGB(200, 200, 200)
+    selectedText.Font = Enum.Font.SourceSans
+    selectedText.TextSize = 18
+    selectedText.TextXAlignment = Enum.TextXAlignment.Left
+    selectedText.TextTruncate = Enum.TextTruncate.AtEnd
+    selectedText.Parent = dropDownButton
+
+    local arrow = Instance.new("ImageLabel")
+    arrow.Size = UDim2.new(0, 20, 0, 20)
+    arrow.Position = UDim2.new(1, -25, 0.5, -10)
+    arrow.AnchorPoint = Vector2.new(0, 0.5)
+    arrow.BackgroundTransparency = 1
+    arrow.Image = "rbxassetid://3926305904"
+    arrow.ImageRectOffset = Vector2.new(364, 364)
+    arrow.ImageRectSize = Vector2.new(36, 36)
+    arrow.ImageColor3 = Color3.fromRGB(142, 142, 142)
+    arrow.Parent = dropDownButton
+
+    local dropDownMenu = Instance.new("Frame")
+    dropDownMenu.Size = UDim2.new(1, -30, 0, 0)
+    dropDownMenu.Position = UDim2.new(0, 15, 0.5, 35)
+    dropDownMenu.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
+    dropDownMenu.BorderSizePixel = 0
+    dropDownMenu.ClipsDescendants = true
+    dropDownMenu.Visible = false
+    dropDownMenu.Parent = frame
+
+    local menuCorner = Instance.new("UICorner")
+    menuCorner.CornerRadius = UDim.new(0, 4)
+    menuCorner.Parent = dropDownMenu
+
+    local menuContainer = Instance.new("ScrollingFrame")
+    menuContainer.Size = UDim2.new(1, 0, 1, 0)
+    menuContainer.Position = UDim2.new(0, 0, 0, 0)
+    menuContainer.BackgroundTransparency = 1
+    menuContainer.ScrollBarThickness = 0
+    menuContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+    menuContainer.Parent = dropDownMenu
+
+    local menuLayout = Instance.new("UIListLayout")
+    menuLayout.Padding = UDim.new(0, 5)
+    menuLayout.Parent = menuContainer
+
+    local isOpen = false
+    local selectedValues = setting.default and (setting.multiSelect and table.clone(setting.default) or {setting.default}) or {}
+
+    local function updateMenu()
+        for _, option in ipairs(setting.options) do
+            local optionFrame = Instance.new("Frame")
+            optionFrame.Size = UDim2.new(1, 0, 0, 30)
+            optionFrame.BackgroundTransparency = 1
+            optionFrame.Parent = menuContainer
+
+            local optionButton = Instance.new("TextButton")
+            optionButton.Size = UDim2.new(1, 0, 1, 0)
+            optionButton.BackgroundColor3 = Color3.fromRGB(30, 30, 32)
+            optionButton.BorderSizePixel = 0
+            optionButton.AutoButtonColor = false
+            optionButton.Text = ""
+            optionButton.Parent = optionFrame
+
+            local optionCorner = Instance.new("UICorner")
+            optionCorner.CornerRadius = UDim.new(0, 4)
+            optionCorner.Parent = optionButton
+
+            local optionText = Instance.new("TextLabel")
+            optionText.Size = UDim2.new(1, -10, 1, 0)
+            optionText.Position = UDim2.new(0, 10, 0, 0)
+            optionText.BackgroundTransparency = 1
+            optionText.Text = option
+            optionText.TextColor3 = Color3.fromRGB(200, 200, 200)
+            optionText.Font = Enum.Font.SourceSans
+            optionText.TextSize = 18
+            optionText.TextXAlignment = Enum.TextXAlignment.Left
+            optionText.Parent = optionButton
+
+            local checkIcon = Instance.new("ImageLabel")
+            checkIcon.Size = UDim2.new(0, 20, 0, 20)
+            checkIcon.Position = UDim2.new(1, -25, 0.5, -10)
+            checkIcon.AnchorPoint = Vector2.new(0, 0.5)
+            checkIcon.BackgroundTransparency = 1
+            checkIcon.Image = "rbxassetid://3926305904"
+            checkIcon.ImageRectOffset = Vector2.new(964, 324)
+            checkIcon.ImageRectSize = Vector2.new(36, 36)
+            checkIcon.ImageColor3 = Color3.fromRGB(255, 75, 75)
+            checkIcon.Visible = false
+            checkIcon.Parent = optionButton
+
+            if setting.multiSelect then
+                checkIcon.Visible = table.find(selectedValues, option) ~= nil
+            else
+                checkIcon.Visible = selectedValues[1] == option
+            end
+
+            optionButton.MouseEnter:Connect(function()
+                tweenColor(optionButton, "BackgroundColor3", Color3.fromRGB(40, 40, 42))
+            end)
+
+            optionButton.MouseLeave:Connect(function()
+                tweenColor(optionButton, "BackgroundColor3", Color3.fromRGB(30, 30, 32))
+            end)
+
+            optionButton.MouseButton1Click:Connect(function()
+                if setting.multiSelect then
+                    local index = table.find(selectedValues, option)
+                    if index then
+                        table.remove(selectedValues, index)
+                        checkIcon.Visible = false
+                    else
+                        table.insert(selectedValues, option)
+                        checkIcon.Visible = true
+                    end
+                else
+                    selectedValues = {option}
+                    for _, child in ipairs(menuContainer:GetChildren()) do
+                        if child:IsA("Frame") then
+                            local icon = child:FindFirstChild("ImageLabel")
+                            if icon then
+                                icon.Visible = child.TextButton.TextLabel.Text == option
+                            end
+                        end
+                    end
+                end
+
+                selectedText.Text = setting.multiSelect and table.concat(selectedValues, ", ") or selectedValues[1]
+                if setting.callback then
+                    setting.callback(setting.multiSelect and selectedValues or selectedValues[1])
+                end
+            end)
+        end
+
+        menuContainer.CanvasSize = UDim2.new(0, 0, 0, #setting.options * 35)
+    end
+
+    local function toggleMenu()
+        isOpen = not isOpen
+        if isOpen then
+            updateMenu()
+            dropDownMenu.Visible = true
+            dropDownMenu:TweenSize(UDim2.new(1, -30, 0, math.min(#setting.options * 35, 200)), "Out", "Quad", 0.2, true)
+            arrow.Rotation = 180
+        else
+            dropDownMenu:TweenSize(UDim2.new(1, -30, 0, 0), "Out", "Quad", 0.2, true, function()
+                dropDownMenu.Visible = false
+                for _, child in ipairs(menuContainer:GetChildren()) do
+                    if child:IsA("Frame") then
+                        child:Destroy()
+                    end
+                end
+            end)
+            arrow.Rotation = 0
+        end
+    end
+
+    dropDownButton.MouseButton1Click:Connect(toggleMenu)
+
+    return frame
+end
+
+local function createTextField(parent, setting, position)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 600, 0, 60)
+    frame.Position = position
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0.5, 0)
+    label.Position = UDim2.new(0, 15, 0, 0)
+    label.Text = setting.name
+    label.TextColor3 = Color3.fromRGB(142, 142, 142)
+    label.Font = Enum.Font.SourceSansBold
+    label.TextSize = 22
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.BackgroundTransparency = 1
+    label.Parent = frame
+
+    local textBoxBackground = Instance.new("Frame")
+    textBoxBackground.Size = UDim2.new(1, -30, 0, 30)
+    textBoxBackground.Position = UDim2.new(0, 15, 0.5, 0)
+    textBoxBackground.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
+    textBoxBackground.BorderSizePixel = 0
+    textBoxBackground.Parent = frame
+
+    local textBoxCorner = Instance.new("UICorner")
+    textBoxCorner.CornerRadius = UDim.new(0, 4)
+    textBoxCorner.Parent = textBoxBackground
+
+    local textBox = Instance.new("TextBox")
+    textBox.Size = UDim2.new(1, -10, 1, -4)
+    textBox.Position = UDim2.new(0, 5, 0, 2)
+    textBox.BackgroundTransparency = 1
+    textBox.Text = setting.default or ""
+    textBox.TextColor3 = Color3.fromRGB(200, 200, 200)
+    textBox.Font = Enum.Font.SourceSans
+    textBox.TextSize = 18
+    textBox.TextXAlignment = Enum.TextXAlignment.Left
+    textBox.PlaceholderText = setting.placeholder or ""
+    textBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
+    textBox.Parent = textBoxBackground
+
+    local function updateValue()
+        if setting.callback then
+            setting.callback(textBox.Text)
+        end
+    end
+
+    textBox.FocusLost:Connect(function()
+        updateValue()
+    end)
+
+    return frame
+end
 
 local function createSlider(parent, setting, position)
 	local frame = Instance.new("Frame")
@@ -243,43 +493,56 @@ local function createToggle(parent, setting, position)
 end
 
 local function showModuleSettings(parent, moduleName)
-	local settingsContainer = _G.mainFrame:FindFirstChild("SettingsContainer")
+    local settingsContainer = _G.mainFrame:FindFirstChild("SettingsContainer")
 
-	for _, child in pairs(settingsContainer:GetChildren()) do
-		if not child:IsA("UICorner") then
-			child:Destroy()
-		end
-	end
+    for _, child in pairs(settingsContainer:GetChildren()) do
+        if not child:IsA("UICorner") then
+            child:Destroy()
+        end
+    end
 
-	if not API.settings[moduleName] and not moduleSettings[moduleName] then
-		settingsContainer.Size = UDim2.new(0, 615, 0, 0)
-		settingsContainer.BackgroundTransparency = 1
-		return
-	end
+    if not API.settings[moduleName] and not moduleSettings[moduleName] then
+        settingsContainer.Size = UDim2.new(0, 615, 0, 0)
+        settingsContainer.BackgroundTransparency = 1
+        return
+    end
 
-	local yOffset = 0
-	local totalHeight = 0
+    local yOffset = 0
+    local totalHeight = 0
 
-	for _, setting in ipairs(moduleSettings[moduleName].settings) do
-		if setting.type == "slider" then
-			totalHeight = totalHeight + 60
-		elseif setting.type == "toggle" then
-			totalHeight = totalHeight + 45
-		end
-	end
+    for _, setting in ipairs(moduleSettings[moduleName].settings) do
+        if setting.type == "slider" then
+            totalHeight = totalHeight + 60
+        elseif setting.type == "toggle" then
+            totalHeight = totalHeight + 45
+        elseif setting.type == "textfield" then
+            totalHeight = totalHeight + 60
+        elseif setting.type == "dropdown" then
+            totalHeight = totalHeight + 60 + (setting.options and #setting.options * 35 or 0)
+        end
+    end
 
-	settingsContainer.BackgroundTransparency = 0
-	settingsContainer.Size = UDim2.new(0, 615, 0, totalHeight + 30)
+    settingsContainer.BackgroundTransparency = 0
+    settingsContainer.Size = UDim2.new(0, 615, 0, math.min(totalHeight + 30, 400)) -- Ограничение максимальной высоты
 
-	for _, setting in ipairs(moduleSettings[moduleName].settings) do
-		if setting.type == "slider" then
-			local slider = createSlider(settingsContainer, setting, UDim2.new(0, 0, 0, yOffset))
-			yOffset = yOffset + 30
-		elseif setting.type == "toggle" then
-			local toggle = createToggle(settingsContainer, setting, UDim2.new(0, 0, 0, yOffset))
-			yOffset = yOffset + 45
-		end
-	end
+    -- Создаем скроллируемый контейнер
+    local scrollFrame, container = createScrollableContainer(settingsContainer, UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), UDim.new(0, 15))
+
+    for _, setting in ipairs(moduleSettings[moduleName].settings) do
+        if setting.type == "slider" then
+            local slider = createSlider(scrollFrame, setting, UDim2.new(0, 0, 0, yOffset))
+            yOffset = yOffset + 60
+        elseif setting.type == "toggle" then
+            local toggle = createToggle(scrollFrame, setting, UDim2.new(0, 0, 0, yOffset))
+            yOffset = yOffset + 45
+        elseif setting.type == "textfield" then
+            local textField = createTextField(scrollFrame, setting, UDim2.new(0, 0, 0, yOffset))
+            yOffset = yOffset + 60
+        elseif setting.type == "dropdown" then
+            local dropDown = createDropDown(scrollFrame, setting, UDim2.new(0, 0, 0, yOffset))
+            yOffset = yOffset + 60 + (setting.options and #setting.options * 35 or 0)
+        end
+    end
 end
 
 local function createModuleButton(parent, moduleData)
