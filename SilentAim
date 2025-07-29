@@ -1,4 +1,4 @@
--- Получаем настройки из UI или используем дефолтные
+
 local settings = _G.SilentAimSettings or {
     FOV = 100,
     ShowFOVCircle = true,
