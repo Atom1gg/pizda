@@ -49,6 +49,32 @@ local function tweenColor(object, property, targetColor, duration)
 	return tween
 end
 
+local function createScrollableContainer(parent, size, position, padding)
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Size = size
+    scrollFrame.Position = position
+    scrollFrame.BackgroundTransparency = 1
+    scrollFrame.ScrollBarThickness = 4
+    scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scrollFrame.Parent = parent
+    
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 1, 0)
+    container.BackgroundTransparency = 1
+    container.Parent = scrollFrame
+    
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = padding
+    layout.Parent = container
+    
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
+    end)
+    
+    return scrollFrame, container
+end
+
 local function tweenTransparency(object, property, targetValue, duration)
 	local tweenInfo = TweenInfo.new(
 		duration or 0.2,
@@ -494,55 +520,55 @@ end
 
 local function showModuleSettings(parent, moduleName)
     local settingsContainer = _G.mainFrame:FindFirstChild("SettingsContainer")
-
+    
+    -- Очищаем предыдущие настройки
     for _, child in pairs(settingsContainer:GetChildren()) do
-        if not child:IsA("UICorner") then
+        if not child:IsA("UICorner") and not child:IsA("ScrollingFrame") then
             child:Destroy()
         end
     end
-
-    if not API.settings[moduleName] and not moduleSettings[moduleName] then
+    
+    -- Проверяем наличие настроек для этого модуля
+    local settings = API.settings[moduleName] or moduleSettings[moduleName]
+    
+    if not settings or not settings.settings or #settings.settings == 0 then
         settingsContainer.Size = UDim2.new(0, 615, 0, 0)
         settingsContainer.BackgroundTransparency = 1
         return
     end
-
-    local yOffset = 0
-    local totalHeight = 0
-
-    for _, setting in ipairs(moduleSettings[moduleName].settings) do
-        if setting.type == "slider" then
-            totalHeight = totalHeight + 60
-        elseif setting.type == "toggle" then
-            totalHeight = totalHeight + 45
-        elseif setting.type == "textfield" then
-            totalHeight = totalHeight + 60
-        elseif setting.type == "dropdown" then
-            totalHeight = totalHeight + 60 + (setting.options and #setting.options * 35 or 0)
-        end
-    end
-
+    
     settingsContainer.BackgroundTransparency = 0
-    settingsContainer.Size = UDim2.new(0, 615, 0, math.min(totalHeight + 30, 400)) -- Ограничение максимальной высоты
-
-    -- Создаем скроллируемый контейнер
-    local scrollFrame, container = createScrollableContainer(settingsContainer, UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), UDim.new(0, 15))
-
-    for _, setting in ipairs(moduleSettings[moduleName].settings) do
+    settingsContainer.Size = UDim2.new(0, 615, 1, -110) -- Задаем фиксированный размер
+    
+    -- Создаем скроллируемую область
+    local scrollFrame, container = createScrollableContainer(
+        settingsContainer,
+        UDim2.new(1, -10, 1, -10),
+        UDim2.new(0, 5, 0, 5),
+        UDim.new(0, 15)
+    )
+    
+    local yOffset = 0
+    
+    -- Добавляем настройки
+    for _, setting in ipairs(settings.settings) do
         if setting.type == "slider" then
-            local slider = createSlider(scrollFrame, setting, UDim2.new(0, 0, 0, yOffset))
+            local slider = createSlider(container, setting, UDim2.new(0, 0, 0, yOffset))
             yOffset = yOffset + 60
         elseif setting.type == "toggle" then
-            local toggle = createToggle(scrollFrame, setting, UDim2.new(0, 0, 0, yOffset))
+            local toggle = createToggle(container, setting, UDim2.new(0, 0, 0, yOffset))
             yOffset = yOffset + 45
         elseif setting.type == "textfield" then
-            local textField = createTextField(scrollFrame, setting, UDim2.new(0, 0, 0, yOffset))
+            local textField = createTextField(container, setting, UDim2.new(0, 0, 0, yOffset))
             yOffset = yOffset + 60
         elseif setting.type == "dropdown" then
-            local dropDown = createDropDown(scrollFrame, setting, UDim2.new(0, 0, 0, yOffset))
-            yOffset = yOffset + 60 + (setting.options and #setting.options * 35 or 0)
+            local dropDown = createDropDown(container, setting, UDim2.new(0, 0, 0, yOffset))
+            yOffset = yOffset + 60
         end
     end
+    
+    -- Обновляем размер контента
+    container:FindFirstChildOfClass("UIListLayout"):GetPropertyChangedSignal("AbsoluteContentSize"):Wait()
 end
 
 local function createModuleButton(parent, moduleData)
@@ -978,19 +1004,20 @@ end
 
 
 local function init(config)
-	if config and config.moduleSystem then
-		for k,v in pairs(config.moduleSystem) do
-			moduleSystem[k] = v
-		end
-	end
+    if config and config.moduleSystem then
+        for k,v in pairs(config.moduleSystem) do
+            moduleSystem[k] = v
+        end
+    end
 
-	if config and config.moduleSettings then
-		for k,v in pairs(config.moduleSettings) do
-			API.settings[k] = v
-		end
-	end
+    if config and config.moduleSettings then
+        for k,v in pairs(config.moduleSettings) do
+            API.settings[k] = v
+            moduleSettings[k] = v -- Дублируем для совместимости
+        end
+    end
 
-	createUI()
+    createUI()
 end
 
 return {
