@@ -13,6 +13,7 @@ _G.mainFrame = nil
 local activeCategoryLabel
 local moduleNameLabel
 local slashLabel
+local openDropdowns = {}
 
 local API = {
     modules = {},
@@ -20,6 +21,18 @@ local API = {
     callbacks = {},
     savedSettings = {}
 }
+
+local function closeAllDropdowns(except)
+    for _, dropdown in pairs(openDropdowns) do
+        if dropdown ~= except and dropdown.Close then
+            dropdown:Close()
+        end
+    end
+    openDropdowns = {}
+    if except then
+        table.insert(openDropdowns, except)
+    end
+end
 
 -- Функция для сохранения настроек
 local function saveSettings()
@@ -192,14 +205,14 @@ end
 
 local function createDropDown(parent, setting, position)
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 280, 0, 50) -- Уменьшенный размер
+    frame.Size = UDim2.new(0, 280, 0, 50)
     frame.Position = position
     frame.BackgroundTransparency = 1
     frame.ClipsDescendants = true
     frame.Parent = parent
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.6, 0, 1, 0) -- Размер как у переключателя
+    label.Size = UDim2.new(0.6, 0, 1, 0)
     label.Position = UDim2.new(0, 10, 0, 0)
     label.Text = setting.name
     label.TextColor3 = Color3.fromRGB(142, 142, 142)
@@ -210,8 +223,8 @@ local function createDropDown(parent, setting, position)
     label.Parent = frame
 
     local dropDownButton = Instance.new("TextButton")
-    dropDownButton.Size = UDim2.new(0, 120, 0, 30) -- Компактный размер
-    dropDownButton.Position = UDim2.new(0.6, 10, 0.5, -15) -- Позиция справа
+    dropDownButton.Size = UDim2.new(0, 120, 0, 30)
+    dropDownButton.Position = UDim2.new(0.6, 10, 0.5, -15)
     dropDownButton.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
     dropDownButton.BorderSizePixel = 0
     dropDownButton.AutoButtonColor = false
@@ -234,14 +247,15 @@ local function createDropDown(parent, setting, position)
     selectedText.TextTruncate = Enum.TextTruncate.AtEnd
     selectedText.Parent = dropDownButton
 
+    -- Создаем меню в корне GUI, а не внутри фрейма
     local dropDownMenu = Instance.new("Frame")
-    dropDownMenu.Size = UDim2.new(0, 120, 0, 0) -- Фиксированная ширина
-    dropDownMenu.Position = UDim2.new(0.6, 10, 0.5, 20) -- Под кнопкой
+    dropDownMenu.Size = UDim2.new(0, 120, 0, 0)
     dropDownMenu.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
     dropDownMenu.BorderSizePixel = 0
     dropDownMenu.ClipsDescendants = true
     dropDownMenu.Visible = false
-    dropDownMenu.Parent = frame
+    dropDownMenu.ZIndex = 100
+    dropDownMenu.Parent = _G.mainFrame
 
     local menuCorner = Instance.new("UICorner")
     menuCorner.CornerRadius = UDim.new(0, 4)
@@ -262,7 +276,30 @@ local function createDropDown(parent, setting, position)
     local isOpen = false
     local selectedValues = setting.default and (setting.multiSelect and table.clone(setting.default) or {setting.default}) or {}
 
+    -- Функция для обновления позиции меню
+    local function updateMenuPosition()
+        local buttonPos = dropDownButton.AbsolutePosition
+        local buttonSize = dropDownButton.AbsoluteSize
+        dropDownMenu.Position = UDim2.new(0, buttonPos.X, 0, buttonPos.Y + buttonSize.Y + 5)
+    end
+
+    -- Функция для закрытия меню
+    function frame.Close()
+        if isOpen then
+            isOpen = false
+            dropDownMenu:TweenSize(UDim2.new(0, 120, 0, 0), "Out", "Quad", 0.2, true, function()
+                dropDownMenu.Visible = false
+            end)
+        end
+    end
+
     local function updateMenu()
+        for _, child in ipairs(menuContainer:GetChildren()) do
+            if child:IsA("Frame") then
+                child:Destroy()
+            end
+        end
+
         for _, option in ipairs(setting.options) do
             local optionFrame = Instance.new("Frame")
             optionFrame.Size = UDim2.new(1, 0, 0, 30)
@@ -333,6 +370,14 @@ local function createDropDown(parent, setting, position)
                 end
 
                 selectedText.Text = setting.multiSelect and table.concat(selectedValues, ", ") or selectedValues[1]
+                
+                -- Сохраняем настройки
+                if not API.savedSettings[setting.moduleName] then
+                    API.savedSettings[setting.moduleName] = {}
+                end
+                API.savedSettings[setting.moduleName][setting.name] = setting.multiSelect and selectedValues or selectedValues[1]
+                saveSettings()
+                
                 if setting.callback then
                     setting.callback(setting.multiSelect and selectedValues or selectedValues[1])
                 end
@@ -345,17 +390,32 @@ local function createDropDown(parent, setting, position)
     local function toggleMenu()
         isOpen = not isOpen
         if isOpen then
+            closeAllDropdowns(frame)
+            updateMenuPosition()
             updateMenu()
             dropDownMenu.Visible = true
             dropDownMenu:TweenSize(UDim2.new(0, 120, 0, math.min(#setting.options * 35, 200)), "Out", "Quad", 0.2, true)
         else
-            dropDownMenu:TweenSize(UDim2.new(0, 120, 0, 0), "Out", "Quad", 0.2, true, function()
-                dropDownMenu.Visible = false
-            end)
+            frame:Close()
         end
     end
 
     dropDownButton.MouseButton1Click:Connect(toggleMenu)
+
+    -- Закрытие при клике вне меню
+    local connection
+    dropDownButton.MouseButton1Click:Connect(function()
+        if connection then connection:Disconnect() end
+        connection = UIS.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                local mousePos = input.Position
+                if not dropDownMenu.AbsoluteRect:PointInside(mousePos) and not dropDownButton.AbsoluteRect:PointInside(mousePos) then
+                    frame:Close()
+                    connection:Disconnect()
+                end
+            end
+        end)
+    end)
 
     return frame
 end
@@ -363,13 +423,13 @@ end
 
 local function createTextField(parent, setting, position)
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 280, 0, 50) -- Компактный размер
+    frame.Size = UDim2.new(0, 280, 0, 50)
     frame.Position = position
     frame.BackgroundTransparency = 1
     frame.Parent = parent
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.6, 0, 1, 0) -- Размер как у переключателя
+    label.Size = UDim2.new(0.6, 0, 1, 0)
     label.Position = UDim2.new(0, 10, 0, 0)
     label.Text = setting.name
     label.TextColor3 = Color3.fromRGB(142, 142, 142)
@@ -380,8 +440,8 @@ local function createTextField(parent, setting, position)
     label.Parent = frame
 
     local textBoxBackground = Instance.new("Frame")
-    textBoxBackground.Size = UDim2.new(0, 120, 0, 30) -- Компактный размер
-    textBoxBackground.Position = UDim2.new(0.6, 10, 0.5, -15) -- Позиция справа
+    textBoxBackground.Size = UDim2.new(0, 120, 0, 30)
+    textBoxBackground.Position = UDim2.new(0.6, 10, 0.5, -15)
     textBoxBackground.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
     textBoxBackground.BorderSizePixel = 0
     textBoxBackground.Parent = frame
@@ -404,6 +464,13 @@ local function createTextField(parent, setting, position)
     textBox.Parent = textBoxBackground
 
     local function updateValue()
+        -- Сохраняем настройки
+        if not API.savedSettings[setting.moduleName] then
+            API.savedSettings[setting.moduleName] = {}
+        end
+        API.savedSettings[setting.moduleName][setting.name] = textBox.Text
+        saveSettings()
+        
         if setting.callback then
             setting.callback(textBox.Text)
         end
@@ -530,7 +597,7 @@ end
 
 local function createToggle(parent, setting, position)
     local outerFrame = Instance.new("Frame")
-    outerFrame.Size = UDim2.new(0, 280, 0, 50) -- Фиксированный размер
+    outerFrame.Size = UDim2.new(0, 280, 0, 50)
     outerFrame.Position = position
     outerFrame.BackgroundTransparency = 1
     outerFrame.BorderSizePixel = 0
@@ -549,7 +616,7 @@ local function createToggle(parent, setting, position)
 
     local switchTrack = Instance.new("Frame")
     switchTrack.Size = UDim2.new(0, 40, 0, 20)
-    switchTrack.Position = UDim2.new(0.6, 10, 0.5, -10) -- Фиксированная позиция справа
+    switchTrack.Position = UDim2.new(0.6, 10, 0.5, -10)
     switchTrack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     switchTrack.BorderSizePixel = 0
     switchTrack.Parent = outerFrame
@@ -585,6 +652,14 @@ local function createToggle(parent, setting, position)
                 switchCircle:TweenPosition(UDim2.new(0, 1, 0, 1), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
                 switchCircle.BackgroundColor3 = Color3.fromRGB(142, 142, 142)
             end
+            
+            -- Сохраняем настройки
+            if not API.savedSettings[setting.moduleName] then
+                API.savedSettings[setting.moduleName] = {}
+            end
+            API.savedSettings[setting.moduleName][setting.name] = isEnabled
+            saveSettings()
+            
             if setting.callback then
                 setting.callback(isEnabled)
             end
@@ -594,8 +669,28 @@ local function createToggle(parent, setting, position)
     return outerFrame
 end
 
+function API:saveSettings()
+    saveSettings()
+end
+
+function API:loadSettings()
+    loadSettings()
+    
+    -- Применяем загруженные настройки ко всем модулям
+    for moduleName, settings in pairs(self.settings) do
+        if self.savedSettings[moduleName] then
+            for _, setting in ipairs(settings.settings) do
+                if self.savedSettings[moduleName][setting.name] ~= nil then
+                    setting.default = self.savedSettings[moduleName][setting.name]
+                end
+            end
+        end
+    end
+end
+
 local function showModuleSettings(moduleName)
     clearSettingsContainer()
+    API:loadSettings() -- Загружаем настройки перед отображением
     
     local settingsContainer = _G.mainFrame:FindFirstChild("SettingsContainer")
     if not settingsContainer then return end
@@ -617,7 +712,6 @@ local function showModuleSettings(moduleName)
     
     local yOffset = 0
     for _, setting in ipairs(settings.settings) do
-        -- Добавляем имя модуля к каждой настройке для сохранения
         setting.moduleName = moduleName
         
         if setting.type == "slider" then
