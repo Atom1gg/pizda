@@ -441,7 +441,7 @@ local function createTextField(parent, setting, position)
 
     local textBoxBackground = Instance.new("Frame")
     textBoxBackground.Size = UDim2.new(0, 120, 0, 30)
-    textBoxBackground.Position = UDim2.new(0.8, 320, 0.5, -15)
+    textBoxBackground.Position = UDim2.new(0.8, 305, 0.5, -15)
     textBoxBackground.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
     textBoxBackground.BorderSizePixel = 0
     textBoxBackground.Parent = frame
@@ -716,16 +716,16 @@ local function showModuleSettings(moduleName)
         
         if setting.type == "slider" then
             local slider = createSlider(container, setting, UDim2.new(0, 0, 0, yOffset))
-            yOffset = yOffset + 60
+            yOffset = yOffset + 45
         elseif setting.type == "toggle" then
             local toggle = createToggle(container, setting, UDim2.new(0, 0, 0, yOffset))
             yOffset = yOffset + 45
         elseif setting.type == "textfield" then
             local textField = createTextField(container, setting, UDim2.new(0, 0, 0, yOffset))
-            yOffset = yOffset + 60
+            yOffset = yOffset + 45
         elseif setting.type == "dropdown" then
             local dropDown = createDropDown(container, setting, UDim2.new(0, 0, 0, yOffset))
-            yOffset = yOffset + 60
+            yOffset = yOffset + 45
         end
     end
 end
