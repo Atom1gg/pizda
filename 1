@@ -49,6 +49,20 @@ local function tweenColor(object, property, targetColor, duration)
 	return tween
 end
 
+local function clearSettingsContainer()
+    local settingsContainer = _G.mainFrame:FindFirstChild("SettingsContainer")
+    if settingsContainer then
+        -- Уничтожаем все дочерние элементы, кроме UICorner
+        for _, child in pairs(settingsContainer:GetChildren()) do
+            if not child:IsA("UICorner") then
+                child:Destroy()
+            end
+        end
+        settingsContainer.BackgroundTransparency = 1
+        settingsContainer.Size = UDim2.new(0, 615, 0, 0)
+    end
+end
+
 local function createScrollableContainer(parent, size, position, padding)
     local scrollFrame = Instance.new("ScrollingFrame")
     scrollFrame.Size = size
@@ -518,39 +532,52 @@ local function createToggle(parent, setting, position)
 	return outerFrame
 end
 
-local function showModuleSettings(parent, moduleName)
-    local settingsContainer = _G.mainFrame:FindFirstChild("SettingsContainer")
+local function showModuleSettings(moduleName)
+    -- Сначала полностью очищаем контейнер
+    clearSettingsContainer()
     
-    -- Очищаем предыдущие настройки
-    for _, child in pairs(settingsContainer:GetChildren()) do
-        if not child:IsA("UICorner") and not child:IsA("ScrollingFrame") then
-            child:Destroy()
-        end
-    end
+    local settingsContainer = _G.mainFrame:FindFirstChild("SettingsContainer")
+    if not settingsContainer then return end
     
     -- Проверяем наличие настроек для этого модуля
     local settings = API.settings[moduleName] or moduleSettings[moduleName]
-    
     if not settings or not settings.settings or #settings.settings == 0 then
-        settingsContainer.Size = UDim2.new(0, 615, 0, 0)
-        settingsContainer.BackgroundTransparency = 1
         return
     end
     
+    -- Настраиваем контейнер
     settingsContainer.BackgroundTransparency = 0
-    settingsContainer.Size = UDim2.new(0, 615, 1, -110) -- Задаем фиксированный размер
+    settingsContainer.Size = UDim2.new(0, 615, 1, -110)
     
     -- Создаем скроллируемую область
-    local scrollFrame, container = createScrollableContainer(
-        settingsContainer,
-        UDim2.new(1, -10, 1, -10),
-        UDim2.new(0, 5, 0, 5),
-        UDim.new(0, 15)
-    )
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Name = "SettingsScrollFrame"
+    scrollFrame.Size = UDim2.new(1, -10, 1, -10)
+    scrollFrame.Position = UDim2.new(0, 5, 0, 5)
+    scrollFrame.BackgroundTransparency = 1
+    scrollFrame.ScrollBarThickness = 4
+    scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scrollFrame.Parent = settingsContainer
     
-    local yOffset = 0
+    local container = Instance.new("Frame")
+    container.Name = "SettingsContent"
+    container.Size = UDim2.new(1, 0, 0, 0)
+    container.BackgroundTransparency = 1
+    container.Parent = scrollFrame
+    
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 15)
+    layout.Parent = container
+    
+    -- Следим за изменением размера контента
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        container.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y)
+        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
+    end)
     
     -- Добавляем настройки
+    local yOffset = 0
     for _, setting in ipairs(settings.settings) do
         if setting.type == "slider" then
             local slider = createSlider(container, setting, UDim2.new(0, 0, 0, yOffset))
@@ -566,162 +593,166 @@ local function showModuleSettings(parent, moduleName)
             yOffset = yOffset + 60
         end
     end
-    
-    -- Обновляем размер контента
-    container:FindFirstChildOfClass("UIListLayout"):GetPropertyChangedSignal("AbsoluteContentSize"):Wait()
 end
 
 local function createModuleButton(parent, moduleData)
-	local moduleButton = Instance.new("Frame")
-	moduleButton.Size = UDim2.new(1, -20, 0, 40)
-	moduleButton.Position = UDim2.new(0, 10, 0, 0)
-	moduleButton.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-	moduleButton.BorderSizePixel = 0
+    local moduleButton = Instance.new("Frame")
+    moduleButton.Size = UDim2.new(1, -20, 0, 40)
+    moduleButton.Position = UDim2.new(0, 10, 0, 0)
+    moduleButton.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+    moduleButton.BorderSizePixel = 0
+    moduleButton.Parent = parent
 
-	local moduleCorner = Instance.new("UICorner")
-	moduleCorner.CornerRadius = UDim.new(0, 6)
-	moduleCorner.Parent = moduleButton
+    local moduleCorner = Instance.new("UICorner")
+    moduleCorner.CornerRadius = UDim.new(0, 6)
+    moduleCorner.Parent = moduleButton
 
-	local activeLine = Instance.new("Frame")
-	activeLine.Size = UDim2.new(0, 2, 0, 0)
-	activeLine.Position = UDim2.new(0, 0, 0.5, 0)
-	activeLine.AnchorPoint = Vector2.new(0, 0.5)
-	activeLine.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
-	activeLine.BorderSizePixel = 0
-	activeLine.Transparency = 1
-	activeLine.Parent = moduleButton
+    local activeLine = Instance.new("Frame")
+    activeLine.Size = UDim2.new(0, 2, 0, 0)
+    activeLine.Position = UDim2.new(0, 0, 0.5, 0)
+    activeLine.AnchorPoint = Vector2.new(0, 0.5)
+    activeLine.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
+    activeLine.BorderSizePixel = 0
+    activeLine.Transparency = 1
+    activeLine.Parent = moduleButton
 
-	local moduleName = Instance.new("TextLabel")
-	moduleName.Size = UDim2.new(1, -20, 1, 0)
-	moduleName.Position = UDim2.new(0, 10, 0, 0)
-	moduleName.BackgroundTransparency = 1
-	moduleName.Text = moduleData.name
-	moduleName.TextColor3 = Color3.fromRGB(150, 153, 163)
-	moduleName.TextXAlignment = Enum.TextXAlignment.Left
-	moduleName.Font = Enum.Font.Gotham
-	moduleName.TextSize = 18
-	moduleName.Parent = moduleButton
+    local moduleName = Instance.new("TextLabel")
+    moduleName.Size = UDim2.new(1, -20, 1, 0)
+    moduleName.Position = UDim2.new(0, 10, 0, 0)
+    moduleName.BackgroundTransparency = 1
+    moduleName.Text = moduleData.name
+    moduleName.TextColor3 = Color3.fromRGB(150, 153, 163)
+    moduleName.TextXAlignment = Enum.TextXAlignment.Left
+    moduleName.Font = Enum.Font.Gotham
+    moduleName.TextSize = 18
+    moduleName.Parent = moduleButton
 
-	local textGradient = Instance.new("UIGradient")
-	textGradient.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0),
-		NumberSequenceKeypoint.new(0.8, 0),
-		NumberSequenceKeypoint.new(1, 1)
-	})
-	textGradient.Parent = moduleName
+    local textGradient = Instance.new("UIGradient")
+    textGradient.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0),
+        NumberSequenceKeypoint.new(0.8, 0),
+        NumberSequenceKeypoint.new(1, 1)
+    })
+    textGradient.Parent = moduleName
 
-	local clickDetector = Instance.new("TextButton")
-	clickDetector.Size = UDim2.new(1, 0, 1, 0)
-	clickDetector.Position = UDim2.new(0, 0, 0, 0)
-	clickDetector.BackgroundTransparency = 1
-	clickDetector.Text = ""
-	clickDetector.ZIndex = 10
-	clickDetector.Parent = moduleButton
+    local clickDetector = Instance.new("TextButton")
+    clickDetector.Size = UDim2.new(1, 0, 1, 0)
+    clickDetector.Position = UDim2.new(0, 0, 0, 0)
+    clickDetector.BackgroundTransparency = 1
+    clickDetector.Text = ""
+    clickDetector.ZIndex = 10
+    clickDetector.Parent = moduleButton
 
-	clickDetector.MouseEnter:Connect(function()
-		if not moduleData.enabled then
-			tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(20, 20, 22), 0.15)
-			tweenColor(moduleName, "TextColor3", Color3.fromRGB(180, 183, 193), 0.15)
-		end
-	end)
+    -- Добавляем debounce для предотвращения множественных нажатий
+    local debounce = false
 
-	clickDetector.MouseLeave:Connect(function()
-		if not moduleData.enabled then
-			tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17), 0.15)
-			tweenColor(moduleName, "TextColor3", Color3.fromRGB(150, 153, 163), 0.15)
-		end
-	end)
+    clickDetector.MouseEnter:Connect(function()
+        if not moduleData.enabled then
+            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(20, 20, 22), 0.15)
+            tweenColor(moduleName, "TextColor3", Color3.fromRGB(180, 183, 193), 0.15)
+        end
+    end)
 
-	clickDetector.MouseButton1Down:Connect(function()
-		for _, otherButton in pairs(parent:GetChildren()) do
-			if otherButton:IsA("Frame") and otherButton ~= moduleButton then
-				local otherLine = otherButton:FindFirstChild("Frame")
-				local otherText = otherButton:FindFirstChild("TextLabel")
+    clickDetector.MouseLeave:Connect(function()
+        if not moduleData.enabled then
+            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17), 0.15)
+            tweenColor(moduleName, "TextColor3", Color3.fromRGB(150, 153, 163), 0.15)
+        end
+    end)
 
-				if otherLine then 
-					tweenTransparency(otherLine, "Transparency", 1)
-					tweenSize(otherLine, "Size", UDim2.new(0, 2, 0, 0))
-				end
-				if otherText then 
-					tweenColor(otherText, "TextColor3", Color3.fromRGB(150, 153, 163)) 
-				end
-				tweenColor(otherButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
+    clickDetector.MouseButton1Click:Connect(function()
+        if debounce then return end
+        debounce = true
 
-				local otherIndex = otherButton:GetAttribute("ModuleIndex")
-				if otherIndex then
-					if API.modules[moduleSystem.activeCategory] then
-						API.modules[moduleSystem.activeCategory][otherIndex].enabled = false
-					else
-						moduleSystem.modules[moduleSystem.activeCategory][otherIndex].enabled = false
-					end
-				end
-			end
-		end
+        -- Отключаем все другие модули в этой категории
+        for _, otherButton in pairs(parent:GetChildren()) do
+            if otherButton:IsA("Frame") and otherButton ~= moduleButton then
+                local otherLine = otherButton:FindFirstChild("Frame")
+                local otherText = otherButton:FindFirstChild("TextLabel")
+                local otherIndex = otherButton:GetAttribute("ModuleIndex")
 
-		moduleData.enabled = not moduleData.enabled
+                if otherLine then 
+                    tweenTransparency(otherLine, "Transparency", 1)
+                    tweenSize(otherLine, "Size", UDim2.new(0, 2, 0, 0))
+                end
+                if otherText then 
+                    tweenColor(otherText, "TextColor3", Color3.fromRGB(150, 153, 163)) 
+                end
+                tweenColor(otherButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
 
-		if moduleData.enabled then
-			tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
-			tweenColor(moduleName, "TextColor3", Color3.fromRGB(255, 75, 75))
+                if otherIndex then
+                    if API.modules[moduleSystem.activeCategory] then
+                        API.modules[moduleSystem.activeCategory][otherIndex].enabled = false
+                    else
+                        moduleSystem.modules[moduleSystem.activeCategory][otherIndex].enabled = false
+                    end
+                end
+            end
+        end
 
-			activeLine.Transparency = 0
-			tweenSize(activeLine, "Size", UDim2.new(0, 2, 1, -20))
+        -- Переключаем состояние текущего модуля
+        moduleData.enabled = not moduleData.enabled
 
-			task.delay(0.1, function()
-				slashLabel.Visible = true
-				moduleNameLabel.Text = moduleData.name
-				tweenColor(moduleNameLabel, "TextColor3", Color3.fromRGB(255, 75, 75))
-				moduleSystem.activeModuleName = moduleData.name
-				showModuleSettings(_G.mainFrame, moduleData.name)
-			end)
+        if moduleData.enabled then
+            -- Включаем модуль
+            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
+            tweenColor(moduleName, "TextColor3", Color3.fromRGB(255, 75, 75))
 
-			if API.callbacks[moduleData.name] and API.callbacks[moduleData.name].onEnable then
-				pcall(API.callbacks[moduleData.name].onEnable)
-			end
-		else
-			tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
-			tweenColor(moduleName, "TextColor3", Color3.fromRGB(150, 153, 163))
+            activeLine.Transparency = 0
+            tweenSize(activeLine, "Size", UDim2.new(0, 2, 1, -20))
 
-			tweenTransparency(activeLine, "Transparency", 1)
-			tweenSize(activeLine, "Size", UDim2.new(0, 2, 0, 0))
+            -- Обновляем UI и показываем настройки
+            task.delay(0.1, function()
+                slashLabel.Visible = true
+                moduleNameLabel.Text = moduleData.name
+                tweenColor(moduleNameLabel, "TextColor3", Color3.fromRGB(255, 75, 75))
+                moduleSystem.activeModuleName = moduleData.name
+                showModuleSettings(moduleData.name)
+            end)
 
-			task.delay(0.2, function()
-				slashLabel.Visible = false
-				moduleNameLabel.Text = ""
-				moduleSystem.activeModuleName = nil
+            -- Вызываем callback если есть
+            if API.callbacks[moduleData.name] and API.callbacks[moduleData.name].onEnable then
+                pcall(API.callbacks[moduleData.name].onEnable)
+            end
+        else
+            -- Выключаем модуль
+            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
+            tweenColor(moduleName, "TextColor3", Color3.fromRGB(150, 153, 163))
 
-				local settingsContainer = _G.mainFrame:FindFirstChild("SettingsContainer")
-				if settingsContainer then
-					tweenTransparency(settingsContainer, "BackgroundTransparency", 1)
-					task.delay(0.2, function()
-						for _, child in pairs(settingsContainer:GetChildren()) do
-							if not child:IsA("UICorner") then
-								child:Destroy()
-							end
-						end
-						settingsContainer.Size = UDim2.new(0, 615, 0, 0)
-					end)
-				end
-			end)
+            tweenTransparency(activeLine, "Transparency", 1)
+            tweenSize(activeLine, "Size", UDim2.new(0, 2, 0, 0))
 
-			if API.callbacks[moduleData.name] and API.callbacks[moduleData.name].onDisable then
-				pcall(API.callbacks[moduleData.name].onDisable)
-			end
-		end
+            -- Очищаем UI
+            task.delay(0.2, function()
+                slashLabel.Visible = false
+                moduleNameLabel.Text = ""
+                moduleSystem.activeModuleName = nil
+                clearSettingsContainer() -- Очищаем настройки
+            end)
 
-		if moduleData.callback then
-			pcall(moduleData.callback, moduleData.enabled)
-		end
-	end)
+            -- Вызываем callback если есть
+            if API.callbacks[moduleData.name] and API.callbacks[moduleData.name].onDisable then
+                pcall(API.callbacks[moduleData.name].onDisable)
+            end
+        end
 
-	if moduleData.enabled then
-		moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
-		moduleName.TextColor3 = Color3.fromRGB(255, 75, 75)
-		activeLine.Size = UDim2.new(0, 2, 1, -20)
-		activeLine.Transparency = 0
-	end
+        -- Вызываем общий callback модуля
+        if moduleData.callback then
+            pcall(moduleData.callback, moduleData.enabled)
+        end
 
-	return moduleButton
+        debounce = false
+    end)
+
+    -- Если модуль уже включен, устанавливаем соответствующий вид
+    if moduleData.enabled then
+        moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
+        moduleName.TextColor3 = Color3.fromRGB(255, 75, 75)
+        activeLine.Size = UDim2.new(0, 2, 1, -20)
+        activeLine.Transparency = 0
+    end
+
+    return moduleButton
 end
 
 
