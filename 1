@@ -1,11 +1,12 @@
 local player = game:GetService("Players").LocalPlayer
 local existingUI = player.PlayerGui:FindFirstChild("MyUI")
 if existingUI then
-	existingUI:Destroy()
+    existingUI:Destroy()
 end
 
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
 
 _G.mainFrame = nil
 
@@ -13,46 +14,83 @@ local activeCategoryLabel
 local moduleNameLabel
 local slashLabel
 
-
 local API = {
-	modules = {},
-	settings = {},
-	callbacks = {}
+    modules = {},
+    settings = {},
+    callbacks = {},
+    savedSettings = {}
 }
 
+-- Функция для сохранения настроек
+local function saveSettings()
+    local success, err = pcall(function()
+        writefile("ui_settings.json", HttpService:JSONEncode(API.savedSettings))
+    end)
+    if not success then
+        warn("Failed to save settings:", err)
+    end
+end
+
+-- Функция для загрузки настроек
+local function loadSettings()
+    local success, result = pcall(function()
+        if isfile("ui_settings.json") then
+            return HttpService:JSONDecode(readfile("ui_settings.json"))
+        end
+        return {}
+    end)
+    if success then
+        API.savedSettings = result or {}
+    else
+        warn("Failed to load settings:", result)
+        API.savedSettings = {}
+    end
+end
+
+-- Загружаем настройки при старте
+loadSettings()
+
 function API:registerModule(category, moduleData)
-	self.modules[category] = self.modules[category] or {}
-	table.insert(self.modules[category], moduleData)
+    self.modules[category] = self.modules[category] or {}
+    table.insert(self.modules[category], moduleData)
 end
 
 function API:registerSettings(moduleName, settingsTable)
-	self.settings[moduleName] = {settings = settingsTable}
+    self.settings[moduleName] = {settings = settingsTable}
+    
+    -- Загружаем сохраненные значения
+    if API.savedSettings[moduleName] then
+        for _, setting in ipairs(settingsTable) do
+            if API.savedSettings[moduleName][setting.name] ~= nil then
+                setting.default = API.savedSettings[moduleName][setting.name]
+            end
+        end
+    end
 end
 
 local moduleSystem = {
-	activeCategory = nil,
-	activeModule = nil,
-	activeModuleName = nil,
-	modules = API.modules
+    activeCategory = nil,
+    activeModule = nil,
+    activeModuleName = nil,
+    modules = API.modules
 }
 
 local moduleSettings = API.settings
 
 local function tweenColor(object, property, targetColor, duration)
-	local tweenInfo = TweenInfo.new(
-		duration or 0.2,
-		Enum.EasingStyle.Quad,
-		Enum.EasingDirection.Out
-	)
-	local tween = TweenService:Create(object, tweenInfo, {[property] = targetColor})
-	tween:Play()
-	return tween
+    local tweenInfo = TweenInfo.new(
+        duration or 0.2,
+        Enum.EasingStyle.Quad,
+        Enum.EasingDirection.Out
+    )
+    local tween = TweenService:Create(object, tweenInfo, {[property] = targetColor})
+    tween:Play()
+    return tween
 end
 
 local function clearSettingsContainer()
     local settingsContainer = _G.mainFrame:FindFirstChild("SettingsContainer")
     if settingsContainer then
-        -- Уничтожаем все дочерние элементы, кроме UICorner
         for _, child in pairs(settingsContainer:GetChildren()) do
             if not child:IsA("UICorner") then
                 child:Destroy()
@@ -68,10 +106,32 @@ local function createScrollableContainer(parent, size, position, padding)
     scrollFrame.Size = size
     scrollFrame.Position = position
     scrollFrame.BackgroundTransparency = 1
-    scrollFrame.ScrollBarThickness = 4
-    scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+    scrollFrame.ScrollBarThickness = 0 -- Скрываем скроллбар
     scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
     scrollFrame.Parent = parent
+    
+    -- Добавляем невидимый скроллбар с анимацией
+    local scrollBar = Instance.new("Frame")
+    scrollBar.Size = UDim2.new(0, 4, 1, 0)
+    scrollBar.Position = UDim2.new(1, -4, 0, 0)
+    scrollBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    scrollBar.BorderSizePixel = 0
+    scrollBar.Transparency = 1
+    scrollBar.Parent = scrollFrame
+    
+    local scrollBarCorner = Instance.new("UICorner")
+    scrollBarCorner.CornerRadius = UDim.new(1, 0)
+    scrollBarCorner.Parent = scrollBar
+    
+    local scrollBarFill = Instance.new("Frame")
+    scrollBarFill.Size = UDim2.new(1, 0, 0, 0)
+    scrollBarFill.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    scrollBarFill.BorderSizePixel = 0
+    scrollBarFill.Parent = scrollBar
+    
+    local scrollBarFillCorner = Instance.new("UICorner")
+    scrollBarFillCorner.CornerRadius = UDim.new(1, 0)
+    scrollBarFillCorner.Parent = scrollBarFill
     
     local container = Instance.new("Frame")
     container.Size = UDim2.new(1, 0, 1, 0)
@@ -84,31 +144,50 @@ local function createScrollableContainer(parent, size, position, padding)
     
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
+        
+        -- Обновляем скроллбар
+        local visibleRatio = scrollFrame.AbsoluteWindowSize.Y / scrollFrame.CanvasSize.Y
+        scrollBarFill.Size = UDim2.new(1, 0, visibleRatio, 0)
+    end)
+    
+    -- Анимация скроллбара при прокрутке
+    scrollFrame:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+        local positionRatio = scrollFrame.CanvasPosition.Y / (scrollFrame.CanvasSize.Y - scrollFrame.AbsoluteWindowSize.Y)
+        scrollBarFill.Position = UDim2.new(0, 0, positionRatio * (1 - scrollBarFill.Size.Y.Scale), 0)
+    end)
+    
+    -- Показываем скроллбар при наведении
+    scrollFrame.MouseEnter:Connect(function()
+        tweenTransparency(scrollBar, "Transparency", 0.5)
+    end)
+    
+    scrollFrame.MouseLeave:Connect(function()
+        tweenTransparency(scrollBar, "Transparency", 1)
     end)
     
     return scrollFrame, container
 end
 
 local function tweenTransparency(object, property, targetValue, duration)
-	local tweenInfo = TweenInfo.new(
-		duration or 0.2,
-		Enum.EasingStyle.Quad,
-		Enum.EasingDirection.Out
-	)
-	local tween = TweenService:Create(object, tweenInfo, {[property] = targetValue})
-	tween:Play()
-	return tween
+    local tweenInfo = TweenInfo.new(
+        duration or 0.2,
+        Enum.EasingStyle.Quad,
+        Enum.EasingDirection.Out
+    )
+    local tween = TweenService:Create(object, tweenInfo, {[property] = targetValue})
+    tween:Play()
+    return tween
 end
 
 local function tweenSize(object, property, targetSize, duration)
-	local tweenInfo = TweenInfo.new(
-		duration or 0.2,
-		Enum.EasingStyle.Quad,
-		Enum.EasingDirection.Out
-	)
-	local tween = TweenService:Create(object, tweenInfo, {[property] = targetSize})
-	tween:Play()
-	return tween
+    local tweenInfo = TweenInfo.new(
+        duration or 0.2,
+        Enum.EasingStyle.Quad,
+        Enum.EasingDirection.Out
+    )
+    local tween = TweenService:Create(object, tweenInfo, {[property] = targetSize})
+    tween:Play()
+    return tween
 end
 
 local function createDropDown(parent, setting, position)
@@ -155,16 +234,14 @@ local function createDropDown(parent, setting, position)
     selectedText.TextTruncate = Enum.TextTruncate.AtEnd
     selectedText.Parent = dropDownButton
 
-    local arrow = Instance.new("ImageLabel")
-    arrow.Size = UDim2.new(0, 20, 0, 20)
-    arrow.Position = UDim2.new(1, -25, 0.5, -10)
-    arrow.AnchorPoint = Vector2.new(0, 0.5)
-    arrow.BackgroundTransparency = 1
-    arrow.Image = "rbxassetid://3926305904"
-    arrow.ImageRectOffset = Vector2.new(364, 364)
-    arrow.ImageRectSize = Vector2.new(36, 36)
-    arrow.ImageColor3 = Color3.fromRGB(142, 142, 142)
-    arrow.Parent = dropDownButton
+    -- Градиент для обрезания текста
+    local textGradient = Instance.new("UIGradient")
+    textGradient.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0),
+        NumberSequenceKeypoint.new(0.8, 0),
+        NumberSequenceKeypoint.new(1, 1)
+    })
+    textGradient.Parent = selectedText
 
     local dropDownMenu = Instance.new("Frame")
     dropDownMenu.Size = UDim2.new(1, -30, 0, 0)
@@ -195,6 +272,12 @@ local function createDropDown(parent, setting, position)
     local selectedValues = setting.default and (setting.multiSelect and table.clone(setting.default) or {setting.default}) or {}
 
     local function updateMenu()
+        for _, child in ipairs(menuContainer:GetChildren()) do
+            if child:IsA("Frame") then
+                child:Destroy()
+            end
+        end
+
         for _, option in ipairs(setting.options) do
             local optionFrame = Instance.new("Frame")
             optionFrame.Size = UDim2.new(1, 0, 0, 30)
@@ -273,6 +356,14 @@ local function createDropDown(parent, setting, position)
                 end
 
                 selectedText.Text = setting.multiSelect and table.concat(selectedValues, ", ") or selectedValues[1]
+                
+                -- Сохраняем настройки
+                if not API.savedSettings[setting.moduleName] then
+                    API.savedSettings[setting.moduleName] = {}
+                end
+                API.savedSettings[setting.moduleName][setting.name] = setting.multiSelect and selectedValues or selectedValues[1]
+                saveSettings()
+                
                 if setting.callback then
                     setting.callback(setting.multiSelect and selectedValues or selectedValues[1])
                 end
@@ -288,21 +379,29 @@ local function createDropDown(parent, setting, position)
             updateMenu()
             dropDownMenu.Visible = true
             dropDownMenu:TweenSize(UDim2.new(1, -30, 0, math.min(#setting.options * 35, 200)), "Out", "Quad", 0.2, true)
-            arrow.Rotation = 180
         else
             dropDownMenu:TweenSize(UDim2.new(1, -30, 0, 0), "Out", "Quad", 0.2, true, function()
                 dropDownMenu.Visible = false
-                for _, child in ipairs(menuContainer:GetChildren()) do
-                    if child:IsA("Frame") then
-                        child:Destroy()
-                    end
-                end
             end)
-            arrow.Rotation = 0
         end
     end
 
     dropDownButton.MouseButton1Click:Connect(toggleMenu)
+
+    -- Закрываем меню при клике вне его
+    local connection
+    dropDownButton.MouseButton1Click:Connect(function()
+        if connection then connection:Disconnect() end
+        connection = UIS.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                local mousePos = input.Position
+                if not dropDownMenu.AbsoluteRect:PointInside(mousePos) and not dropDownButton.AbsoluteRect:PointInside(mousePos) then
+                    toggleMenu()
+                    connection:Disconnect()
+                end
+            end
+        end)
+    end)
 
     return frame
 end
@@ -349,7 +448,23 @@ local function createTextField(parent, setting, position)
     textBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
     textBox.Parent = textBoxBackground
 
+    -- Градиент для обрезания текста
+    local textGradient = Instance.new("UIGradient")
+    textGradient.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0),
+        NumberSequenceKeypoint.new(0.8, 0),
+        NumberSequenceKeypoint.new(1, 1)
+    })
+    textGradient.Parent = textBox
+
     local function updateValue()
+        -- Сохраняем настройки
+        if not API.savedSettings[setting.moduleName] then
+            API.savedSettings[setting.moduleName] = {}
+        end
+        API.savedSettings[setting.moduleName][setting.name] = textBox.Text
+        saveSettings()
+        
         if setting.callback then
             setting.callback(textBox.Text)
         end
@@ -363,222 +478,217 @@ local function createTextField(parent, setting, position)
 end
 
 local function createSlider(parent, setting, position)
-	local frame = Instance.new("Frame")
-	frame.Size = UDim2.new(0, 600, 0, 120)
-	frame.Position = position
-	frame.BackgroundTransparency = 1
-	frame.Parent = parent
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 600, 0, 120)
+    frame.Position = position
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
 
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, 0, 0.2, 10)
-	label.Position = UDim2.new(0, 15, 0.3, 0)
-	label.Text = setting.name
-	label.TextColor3 = Color3.fromRGB(142, 142, 142)
-	label.Font = Enum.Font.SourceSansBold
-	label.TextSize = 22
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.BackgroundTransparency = 1
-	label.Parent = frame
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0.2, 10)
+    label.Position = UDim2.new(0, 15, 0.3, 0)
+    label.Text = setting.name
+    label.TextColor3 = Color3.fromRGB(142, 142, 142)
+    label.Font = Enum.Font.SourceSansBold
+    label.TextSize = 22
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.BackgroundTransparency = 1
+    label.Parent = frame
 
-	local valueDisplay = Instance.new("TextLabel")
-	valueDisplay.Size = UDim2.new(1, 0, 0.2, 0)
-	valueDisplay.Position = UDim2.new(0, -5, 0.3, 0)
-	valueDisplay.Text = tostring(setting.default) .. (setting.isPercentage and "%" or "")
-	valueDisplay.TextColor3 = Color3.fromRGB(142, 142, 142)
-	valueDisplay.Font = Enum.Font.SourceSans
-	valueDisplay.TextSize = 22
-	valueDisplay.TextXAlignment = Enum.TextXAlignment.Right
-	valueDisplay.BackgroundTransparency = 1
-	valueDisplay.Parent = frame
+    local valueDisplay = Instance.new("TextLabel")
+    valueDisplay.Size = UDim2.new(1, 0, 0.2, 0)
+    valueDisplay.Position = UDim2.new(0, -5, 0.3, 0)
+    valueDisplay.Text = tostring(setting.default) .. (setting.isPercentage and "%" or "")
+    valueDisplay.TextColor3 = Color3.fromRGB(142, 142, 142)
+    valueDisplay.Font = Enum.Font.SourceSans
+    valueDisplay.TextSize = 22
+    valueDisplay.TextXAlignment = Enum.TextXAlignment.Right
+    valueDisplay.BackgroundTransparency = 1
+    valueDisplay.Parent = frame
 
-	local sliderBackground = Instance.new("Frame")
-	sliderBackground.Size = UDim2.new(1, -11, 0, 6)
-	sliderBackground.Position = UDim2.new(0, 10, 0.6, -3)
-	sliderBackground.BackgroundColor3 = Color3.fromRGB(142, 142, 142)
-	sliderBackground.BorderSizePixel = 0
-	sliderBackground.Parent = frame
+    local sliderBackground = Instance.new("Frame")
+    sliderBackground.Size = UDim2.new(1, -11, 0, 6)
+    sliderBackground.Position = UDim2.new(0, 10, 0.6, -3)
+    sliderBackground.BackgroundColor3 = Color3.fromRGB(142, 142, 142)
+    sliderBackground.BorderSizePixel = 0
+    sliderBackground.Parent = frame
 
-	local sliderActive = Instance.new("Frame")
-	sliderActive.Size = UDim2.new((setting.default - setting.min) / (setting.max - setting.min), 0, 1, 0)
-	sliderActive.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
-	sliderActive.BorderSizePixel = 0
-	sliderActive.Parent = sliderBackground
+    local sliderActive = Instance.new("Frame")
+    sliderActive.Size = UDim2.new((setting.default - setting.min) / (setting.max - setting.min), 0, 1, 0)
+    sliderActive.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
+    sliderActive.BorderSizePixel = 0
+    sliderActive.Parent = sliderBackground
 
-	local sliderBackgroundCorner = Instance.new("UICorner")
-	sliderBackgroundCorner.CornerRadius = UDim.new(0, 4)
-	sliderBackgroundCorner.Parent = sliderBackground
+    local sliderBackgroundCorner = Instance.new("UICorner")
+    sliderBackgroundCorner.CornerRadius = UDim.new(0, 4)
+    sliderBackgroundCorner.Parent = sliderBackground
 
-	local sliderActiveCorner = Instance.new("UICorner") 
-	sliderActiveCorner.CornerRadius = UDim.new(0, 4)
-	sliderActiveCorner.Parent = sliderActive
+    local sliderActiveCorner = Instance.new("UICorner") 
+    sliderActiveCorner.CornerRadius = UDim.new(0, 4)
+    sliderActiveCorner.Parent = sliderActive
 
-	local sliderCircle = Instance.new("Frame")
-	sliderCircle.Size = UDim2.new(0, 12, 0, 12)
-	sliderCircle.Position = UDim2.new((setting.default - setting.min) / (setting.max - setting.min), -6, 0.5, -6)
-	sliderCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	sliderCircle.BorderSizePixel = 0
-	sliderCircle.Parent = sliderBackground
+    local sliderCircle = Instance.new("Frame")
+    sliderCircle.Size = UDim2.new(0, 12, 0, 12)
+    sliderCircle.Position = UDim2.new((setting.default - setting.min) / (setting.max - setting.min), -6, 0.5, -6)
+    sliderCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    sliderCircle.BorderSizePixel = 0
+    sliderCircle.Parent = sliderBackground
 
-	local circleCorner = Instance.new("UICorner")
-	circleCorner.CornerRadius = UDim.new(1, 0)
-	circleCorner.Parent = sliderCircle
+    local circleCorner = Instance.new("UICorner")
+    circleCorner.CornerRadius = UDim.new(1, 0)
+    circleCorner.Parent = sliderCircle
 
-	local dragging = false
+    local dragging = false
 
-	local function updateSlider(value)
-		local relativePos = (value - setting.min) / (setting.max - setting.min)
-		sliderCircle.Position = UDim2.new(relativePos, -6, 0.5, -6)
-		sliderActive.Size = UDim2.new(relativePos, 0, 1, 0)
-		valueDisplay.Text = tostring(value) .. (setting.isPercentage and "%" or "")
-		if setting.callback then
-			setting.callback(value)
-		end
-	end
+    local function updateSlider(value)
+        local relativePos = (value - setting.min) / (setting.max - setting.min)
+        sliderCircle.Position = UDim2.new(relativePos, -6, 0.5, -6)
+        sliderActive.Size = UDim2.new(relativePos, 0, 1, 0)
+        valueDisplay.Text = tostring(value) .. (setting.isPercentage and "%" or "")
+        
+        -- Сохраняем настройки
+        if not API.savedSettings[setting.moduleName] then
+            API.savedSettings[setting.moduleName] = {}
+        end
+        API.savedSettings[setting.moduleName][setting.name] = value
+        saveSettings()
+        
+        if setting.callback then
+            setting.callback(value)
+        end
+    end
 
-	sliderCircle.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true
-			sliderCircle:TweenSize(UDim2.new(0, 15, 0, 15), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
-		end
-	end)
+    sliderCircle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            sliderCircle:TweenSize(UDim2.new(0, 15, 0, 15), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
+        end
+    end)
 
-	sliderCircle.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = false
-			sliderCircle:TweenSize(UDim2.new(0, 12, 0, 12), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
-		end
-	end)
+    sliderCircle.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+            sliderCircle:TweenSize(UDim2.new(0, 12, 0, 12), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
+        end
+    end)
 
-	game:GetService("UserInputService").InputChanged:Connect(function(input)
-		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-			local mousePos = input.Position.X
-			local sliderStart = sliderBackground.AbsolutePosition.X
-			local sliderEnd = sliderStart + sliderBackground.AbsoluteSize.X
-			local newX = math.clamp(mousePos, sliderStart, sliderEnd)
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local mousePos = input.Position.X
+            local sliderStart = sliderBackground.AbsolutePosition.X
+            local sliderEnd = sliderStart + sliderBackground.AbsoluteSize.X
+            local newX = math.clamp(mousePos, sliderStart, sliderEnd)
 
-			local relativePos = (newX - sliderStart) / sliderBackground.AbsoluteSize.X
-			local newValue = math.floor(relativePos * (setting.max - setting.min) + setting.min)
-			updateSlider(newValue)
-		end
-	end)
+            local relativePos = (newX - sliderStart) / sliderBackground.AbsoluteSize.X
+            local newValue = math.floor(relativePos * (setting.max - setting.min) + setting.min)
+            updateSlider(newValue)
+        end
+    end)
 
-	updateSlider(setting.default)
-	return frame
+    updateSlider(setting.default)
+    return frame
 end
 
 local function createToggle(parent, setting, position)
-	local outerFrame = Instance.new("Frame")
-	outerFrame.Size = UDim2.new(0, 300, 0, 50)
-	outerFrame.Position = position
-	outerFrame.BackgroundTransparency = 1
-	outerFrame.BorderSizePixel = 0
-	outerFrame.Parent = parent
+    local outerFrame = Instance.new("Frame")
+    outerFrame.Size = UDim2.new(0, 300, 0, 50)
+    outerFrame.Position = position
+    outerFrame.BackgroundTransparency = 1
+    outerFrame.BorderSizePixel = 0
+    outerFrame.Parent = parent
 
-	local enableLabel = Instance.new("TextLabel")
-	enableLabel.Size = UDim2.new(0.2, 0, 1, 0)
-	enableLabel.Position = UDim2.new(0, 10, 0, 0)
-	enableLabel.Text = setting.name
-	enableLabel.TextColor3 = Color3.fromRGB(142, 142, 142)
-	enableLabel.Font = Enum.Font.SourceSansBold
-	enableLabel.TextSize = 22
-	enableLabel.TextXAlignment = Enum.TextXAlignment.Left
-	enableLabel.BackgroundTransparency = 1
-	enableLabel.Parent = outerFrame
+    local enableLabel = Instance.new("TextLabel")
+    enableLabel.Size = UDim2.new(0.2, 0, 1, 0)
+    enableLabel.Position = UDim2.new(0, 10, 0, 0)
+    enableLabel.Text = setting.name
+    enableLabel.TextColor3 = Color3.fromRGB(142, 142, 142)
+    enableLabel.Font = Enum.Font.SourceSansBold
+    enableLabel.TextSize = 22
+    enableLabel.TextXAlignment = Enum.TextXAlignment.Left
+    enableLabel.BackgroundTransparency = 1
+    enableLabel.Parent = outerFrame
 
-	local switchTrack = Instance.new("Frame")
-	switchTrack.Size = UDim2.new(0, 40, 0, 20)
-	switchTrack.Position = UDim2.new(0.8, 320, 0.5, -10)
-	switchTrack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-	switchTrack.BorderSizePixel = 0
-	switchTrack.Parent = outerFrame
+    local switchTrack = Instance.new("Frame")
+    switchTrack.Size = UDim2.new(0, 40, 0, 20)
+    switchTrack.Position = UDim2.new(0.8, -40, 0.5, -10)
+    switchTrack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    switchTrack.BorderSizePixel = 0
+    switchTrack.Parent = outerFrame
 
-	local trackCorner = Instance.new("UICorner")
-	trackCorner.CornerRadius = UDim.new(1, 0)
-	trackCorner.Parent = switchTrack
+    local trackCorner = Instance.new("UICorner")
+    trackCorner.CornerRadius = UDim.new(1, 0)
+    trackCorner.Parent = switchTrack
 
-	local switchCircle = Instance.new("Frame")
-	switchCircle.Size = UDim2.new(0, 18, 0, 18)
-	switchCircle.Position = UDim2.new(0, 1, 0, 1)
-	switchCircle.BackgroundColor3 = Color3.fromRGB(142, 142, 142)
-	switchCircle.BorderSizePixel = 0
-	switchCircle.Parent = switchTrack
+    local switchCircle = Instance.new("Frame")
+    switchCircle.Size = UDim2.new(0, 18, 0, 18)
+    switchCircle.Position = UDim2.new(0, 1, 0, 1)
+    switchCircle.BackgroundColor3 = Color3.fromRGB(142, 142, 142)
+    switchCircle.BorderSizePixel = 0
+    switchCircle.Parent = switchTrack
 
-	local circleCorner = Instance.new("UICorner")
-	circleCorner.CornerRadius = UDim.new(1, 0)
-	circleCorner.Parent = switchCircle
+    local circleCorner = Instance.new("UICorner")
+    circleCorner.CornerRadius = UDim.new(1, 0)
+    circleCorner.Parent = switchCircle
 
-	local isEnabled = setting.default
-	if isEnabled then
-		switchCircle.Position = UDim2.new(1, -19, 0, 1)
-		switchCircle.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
-	end
+    local isEnabled = setting.default
+    if isEnabled then
+        switchCircle.Position = UDim2.new(1, -19, 0, 1)
+        switchCircle.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
+    end
 
-	switchTrack.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			isEnabled = not isEnabled
-			if isEnabled then
-				switchCircle:TweenPosition(UDim2.new(1, -19, 0, 1), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
-				switchCircle.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
-			else
-				switchCircle:TweenPosition(UDim2.new(0, 1, 0, 1), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
-				switchCircle.BackgroundColor3 = Color3.fromRGB(142, 142, 142)
-			end
-			if setting.callback then
-				setting.callback(isEnabled)
-			end
-		end
-	end)
+    switchTrack.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            isEnabled = not isEnabled
+            if isEnabled then
+                switchCircle:TweenPosition(UDim2.new(1, -19, 0, 1), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
+                switchCircle.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
+            else
+                switchCircle:TweenPosition(UDim2.new(0, 1, 0, 1), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
+                switchCircle.BackgroundColor3 = Color3.fromRGB(142, 142, 142)
+            end
+            
+            -- Сохраняем настройки
+            if not API.savedSettings[setting.moduleName] then
+                API.savedSettings[setting.moduleName] = {}
+            end
+            API.savedSettings[setting.moduleName][setting.name] = isEnabled
+            saveSettings()
+            
+            if setting.callback then
+                setting.callback(isEnabled)
+            end
+        end
+    end)
 
-	return outerFrame
+    return outerFrame
 end
 
 local function showModuleSettings(moduleName)
-    -- Сначала полностью очищаем контейнер
     clearSettingsContainer()
     
     local settingsContainer = _G.mainFrame:FindFirstChild("SettingsContainer")
     if not settingsContainer then return end
     
-    -- Проверяем наличие настроек для этого модуля
     local settings = API.settings[moduleName] or moduleSettings[moduleName]
     if not settings or not settings.settings or #settings.settings == 0 then
         return
     end
     
-    -- Настраиваем контейнер
     settingsContainer.BackgroundTransparency = 0
     settingsContainer.Size = UDim2.new(0, 615, 1, -110)
     
-    -- Создаем скроллируемую область
-    local scrollFrame = Instance.new("ScrollingFrame")
-    scrollFrame.Name = "SettingsScrollFrame"
-    scrollFrame.Size = UDim2.new(1, -10, 1, -10)
-    scrollFrame.Position = UDim2.new(0, 5, 0, 5)
-    scrollFrame.BackgroundTransparency = 1
-    scrollFrame.ScrollBarThickness = 4
-    scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    scrollFrame.Parent = settingsContainer
+    local scrollFrame, container = createScrollableContainer(
+        settingsContainer,
+        UDim2.new(1, -10, 1, -10),
+        UDim2.new(0, 5, 0, 5),
+        UDim.new(0, 15)
+    )
     
-    local container = Instance.new("Frame")
-    container.Name = "SettingsContent"
-    container.Size = UDim2.new(1, 0, 0, 0)
-    container.BackgroundTransparency = 1
-    container.Parent = scrollFrame
-    
-    local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0, 15)
-    layout.Parent = container
-    
-    -- Следим за изменением размера контента
-    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        container.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y)
-        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
-    end)
-    
-    -- Добавляем настройки
     local yOffset = 0
     for _, setting in ipairs(settings.settings) do
+        -- Добавляем имя модуля к каждой настройке для сохранения
+        setting.moduleName = moduleName
+        
         if setting.type == "slider" then
             local slider = createSlider(container, setting, UDim2.new(0, 0, 0, yOffset))
             yOffset = yOffset + 60
@@ -643,7 +753,6 @@ local function createModuleButton(parent, moduleData)
     clickDetector.ZIndex = 10
     clickDetector.Parent = moduleButton
 
-    -- Добавляем debounce для предотвращения множественных нажатий
     local debounce = false
 
     clickDetector.MouseEnter:Connect(function()
@@ -664,7 +773,6 @@ local function createModuleButton(parent, moduleData)
         if debounce then return end
         debounce = true
 
-        -- Отключаем все другие модули в этой категории
         for _, otherButton in pairs(parent:GetChildren()) do
             if otherButton:IsA("Frame") and otherButton ~= moduleButton then
                 local otherLine = otherButton:FindFirstChild("Frame")
@@ -690,18 +798,15 @@ local function createModuleButton(parent, moduleData)
             end
         end
 
-        -- Переключаем состояние текущего модуля
         moduleData.enabled = not moduleData.enabled
 
         if moduleData.enabled then
-            -- Включаем модуль
             tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
             tweenColor(moduleName, "TextColor3", Color3.fromRGB(255, 75, 75))
 
             activeLine.Transparency = 0
             tweenSize(activeLine, "Size", UDim2.new(0, 2, 1, -20))
 
-            -- Обновляем UI и показываем настройки
             task.delay(0.1, function()
                 slashLabel.Visible = true
                 moduleNameLabel.Text = moduleData.name
@@ -710,33 +815,28 @@ local function createModuleButton(parent, moduleData)
                 showModuleSettings(moduleData.name)
             end)
 
-            -- Вызываем callback если есть
             if API.callbacks[moduleData.name] and API.callbacks[moduleData.name].onEnable then
                 pcall(API.callbacks[moduleData.name].onEnable)
             end
         else
-            -- Выключаем модуль
             tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
             tweenColor(moduleName, "TextColor3", Color3.fromRGB(150, 153, 163))
 
             tweenTransparency(activeLine, "Transparency", 1)
             tweenSize(activeLine, "Size", UDim2.new(0, 2, 0, 0))
 
-            -- Очищаем UI
             task.delay(0.2, function()
                 slashLabel.Visible = false
                 moduleNameLabel.Text = ""
                 moduleSystem.activeModuleName = nil
-                clearSettingsContainer() -- Очищаем настройки
+                clearSettingsContainer()
             end)
 
-            -- Вызываем callback если есть
             if API.callbacks[moduleData.name] and API.callbacks[moduleData.name].onDisable then
                 pcall(API.callbacks[moduleData.name].onDisable)
             end
         end
 
-        -- Вызываем общий callback модуля
         if moduleData.callback then
             pcall(moduleData.callback, moduleData.enabled)
         end
@@ -744,7 +844,6 @@ local function createModuleButton(parent, moduleData)
         debounce = false
     end)
 
-    -- Если модуль уже включен, устанавливаем соответствующий вид
     if moduleData.enabled then
         moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
         moduleName.TextColor3 = Color3.fromRGB(255, 75, 75)
@@ -755,284 +854,281 @@ local function createModuleButton(parent, moduleData)
     return moduleButton
 end
 
-
 local function updateModuleList(moduleFrame, categoryName)
-	for _, child in pairs(moduleFrame:GetChildren()) do
-		if not child:IsA("UIListLayout") then
-			child:Destroy()
-		end
-	end
+    for _, child in pairs(moduleFrame:GetChildren()) do
+        if not child:IsA("UIListLayout") then
+            child:Destroy()
+        end
+    end
 
-	local categoryModules = API.modules[categoryName] or moduleSystem.modules[categoryName]
-	if categoryModules then
-		for index, moduleData in ipairs(categoryModules) do
-			local moduleButton = createModuleButton(moduleFrame, moduleData)
-			moduleButton:SetAttribute("ModuleIndex", index)
-			moduleButton.Parent = moduleFrame
+    local categoryModules = API.modules[categoryName] or moduleSystem.modules[categoryName]
+    if categoryModules then
+        for index, moduleData in ipairs(categoryModules) do
+            local moduleButton = createModuleButton(moduleFrame, moduleData)
+            moduleButton:SetAttribute("ModuleIndex", index)
+            moduleButton.Parent = moduleFrame
 
-			if moduleData.enabled then
-				local activeLine = moduleButton:FindFirstChild("Frame")
-				local moduleName = moduleButton:FindFirstChild("TextLabel")
+            if moduleData.enabled then
+                local activeLine = moduleButton:FindFirstChild("Frame")
+                local moduleName = moduleButton:FindFirstChild("TextLabel")
 
-				moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
-				if activeLine then activeLine.Visible = true end
-				if moduleName then moduleName.TextColor3 = Color3.fromRGB(255, 75, 75) end
+                moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
+                if activeLine then activeLine.Visible = true end
+                if moduleName then moduleName.TextColor3 = Color3.fromRGB(255, 75, 75) end
 
-				slashLabel.Visible = true
-				moduleNameLabel.Text = moduleData.name
-				moduleNameLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
-				moduleSystem.activeModuleName = moduleData.name
-				showModuleSettings(_G.mainFrame, moduleData.name)
-			end
-		end
-	end
+                slashLabel.Visible = true
+                moduleNameLabel.Text = moduleData.name
+                moduleNameLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
+                moduleSystem.activeModuleName = moduleData.name
+                showModuleSettings(moduleData.name)
+            end
+        end
+    end
 end
 
 local function createUI()
-	local Players = game:GetService("Players")
-	local player = Players.LocalPlayer
+    local Players = game:GetService("Players")
+    local player = Players.LocalPlayer
 
-	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "MyUI"
-	screenGui.Parent = player:WaitForChild("PlayerGui")
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "MyUI"
+    screenGui.Parent = player:WaitForChild("PlayerGui")
 
-	local mainFrame = Instance.new("Frame")
-	mainFrame.Size = UDim2.new(0, 900, 0, 600)
-	mainFrame.Position = UDim2.new(0.5, -450, 0.5, -300)
-	mainFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
-	mainFrame.BorderSizePixel = 0
-	mainFrame.Parent = screenGui
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 900, 0, 600)
+    mainFrame.Position = UDim2.new(0.5, -450, 0.5, -300)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Parent = screenGui
 
-	local mainCorner = Instance.new("UICorner")
-	mainCorner.CornerRadius = UDim.new(0, 8)
-	mainCorner.Parent = mainFrame
+    local mainCorner = Instance.new("UICorner")
+    mainCorner.CornerRadius = UDim.new(0, 8)
+    mainCorner.Parent = mainFrame
 
-	local dragging = false
-	local dragStart
-	local startPos
+    local dragging = false
+    local dragStart
+    local startPos
 
-	local topBar = Instance.new("Frame")
-	topBar.Size = UDim2.new(1, 0, 0, 60)
-	topBar.Position = UDim2.new(0, 0, 0, 0)
-	topBar.BackgroundTransparency = 1
-	topBar.Parent = mainFrame
+    local topBar = Instance.new("Frame")
+    topBar.Size = UDim2.new(1, 0, 0, 60)
+    topBar.Position = UDim2.new(0, 0, 0, 0)
+    topBar.BackgroundTransparency = 1
+    topBar.Parent = mainFrame
 
-	local function updateDrag(input)
-		local delta = input.Position - dragStart
-		local position = UDim2.new(
-			startPos.X.Scale,
-			math.floor(startPos.X.Offset + delta.X),
-			startPos.Y.Scale,
-			math.floor(startPos.Y.Offset + delta.Y)
-		)
-		TweenService:Create(mainFrame, TweenInfo.new(0.1), {Position = position}):Play()
-	end
+    local function updateDrag(input)
+        local delta = input.Position - dragStart
+        local position = UDim2.new(
+            startPos.X.Scale,
+            math.floor(startPos.X.Offset + delta.X),
+            startPos.Y.Scale,
+            math.floor(startPos.Y.Offset + delta.Y)
+        )
+        TweenService:Create(mainFrame, TweenInfo.new(0.1), {Position = position}):Play()
+    end
 
-	topBar.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true
-			dragStart = input.Position
-			startPos = mainFrame.Position
+    topBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = mainFrame.Position
 
-			local connection
-			connection = UIS.InputEnded:Connect(function(inputEnd)
-				if inputEnd.UserInputType == Enum.UserInputType.MouseButton1 then
-					dragging = false
-					connection:Disconnect()
-				end
-			end)
-		end
-	end)
+            local connection
+            connection = UIS.InputEnded:Connect(function(inputEnd)
+                if inputEnd.UserInputType == Enum.UserInputType.MouseButton1 then
+                    dragging = false
+                    connection:Disconnect()
+                end
+            end)
+        end
+    end)
 
-	UIS.InputChanged:Connect(function(input)
-		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-			updateDrag(input)
-		end
-	end)
-	
-	local categoryFrame = Instance.new("Frame")
-	categoryFrame.Size = UDim2.new(0, 75, 1, -6)
-	categoryFrame.Position = UDim2.new(0, 3, 0, 3)
-	categoryFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-	categoryFrame.BorderSizePixel = 0
-	categoryFrame.Parent = mainFrame
+    UIS.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateDrag(input)
+        end
+    end)
+    
+    local categoryFrame = Instance.new("Frame")
+    categoryFrame.Size = UDim2.new(0, 75, 1, -6)
+    categoryFrame.Position = UDim2.new(0, 3, 0, 3)
+    categoryFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+    categoryFrame.BorderSizePixel = 0
+    categoryFrame.Parent = mainFrame
 
-	local categoryList = Instance.new("ScrollingFrame")
-	categoryList.Size = UDim2.new(1, 0, 1, 0)
-	categoryList.Position = UDim2.new(0, 12, 0, 100)
-	categoryList.BackgroundTransparency = 1
-	categoryList.ScrollBarThickness = 0
-	categoryList.CanvasSize = UDim2.new(0, 0, 0, 500)
-	categoryList.Parent = categoryFrame
+    local categoryList = Instance.new("ScrollingFrame")
+    categoryList.Size = UDim2.new(1, 0, 1, 0)
+    categoryList.Position = UDim2.new(0, 12, 0, 100)
+    categoryList.BackgroundTransparency = 1
+    categoryList.ScrollBarThickness = 0
+    categoryList.CanvasSize = UDim2.new(0, 0, 0, 500)
+    categoryList.Parent = categoryFrame
 
-	local categoryLayout = Instance.new("UIListLayout")
-	categoryLayout.Padding = UDim.new(0, 30)
-	categoryLayout.Parent = categoryList
+    local categoryLayout = Instance.new("UIListLayout")
+    categoryLayout.Padding = UDim.new(0, 30)
+    categoryLayout.Parent = categoryList
 
-	local ModuleFrame = Instance.new("Frame")
-	ModuleFrame.Size = UDim2.new(0, 150, 1, -6)
-	ModuleFrame.Position = UDim2.new(0, 80, 0, 3)
-	ModuleFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-	ModuleFrame.BorderSizePixel = 0
-	ModuleFrame.Parent = mainFrame
+    local ModuleFrame = Instance.new("Frame")
+    ModuleFrame.Size = UDim2.new(0, 150, 1, -6)
+    ModuleFrame.Position = UDim2.new(0, 80, 0, 3)
+    ModuleFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+    ModuleFrame.BorderSizePixel = 0
+    ModuleFrame.Parent = mainFrame
 
-	local moduleList = Instance.new("ScrollingFrame")
-	moduleList.Size = UDim2.new(1, 0, 1, -50)
-	moduleList.Position = UDim2.new(0, 10, 0, 100)
-	moduleList.BackgroundTransparency = 1
-	moduleList.ScrollBarThickness = 0
-	moduleList.CanvasSize = UDim2.new(0, 0, 0, 500)
-	moduleList.Parent = ModuleFrame
+    local moduleList = Instance.new("ScrollingFrame")
+    moduleList.Size = UDim2.new(1, 0, 1, -50)
+    moduleList.Position = UDim2.new(0, 10, 0, 100)
+    moduleList.BackgroundTransparency = 1
+    moduleList.ScrollBarThickness = 0
+    moduleList.CanvasSize = UDim2.new(0, 0, 0, 500)
+    moduleList.Parent = ModuleFrame
 
-	local moduleLayout = Instance.new("UIListLayout")
-	moduleLayout.Padding = UDim.new(0, 10)
-	moduleLayout.Parent = moduleList
+    local moduleLayout = Instance.new("UIListLayout")
+    moduleLayout.Padding = UDim.new(0, 10)
+    moduleLayout.Parent = moduleList
 
-	local activeCategory = nil
+    local activeCategory = nil
 
-	activeCategoryLabel = Instance.new("TextLabel")
-	activeCategoryLabel.Size = UDim2.new(0, 300, 0, 50)
-	activeCategoryLabel.Position = UDim2.new(0.5, -350, 0.5, -280)
-	activeCategoryLabel.BackgroundTransparency = 1
-	activeCategoryLabel.Text = ""
-	activeCategoryLabel.TextSize = 22
-	activeCategoryLabel.Font = Enum.Font.Gotham
-	activeCategoryLabel.TextColor3 = Color3.fromRGB(150, 153, 163)
-	activeCategoryLabel.TextXAlignment = Enum.TextXAlignment.Left
-	activeCategoryLabel.Parent = mainFrame
+    activeCategoryLabel = Instance.new("TextLabel")
+    activeCategoryLabel.Size = UDim2.new(0, 300, 0, 50)
+    activeCategoryLabel.Position = UDim2.new(0.5, -350, 0.5, -280)
+    activeCategoryLabel.BackgroundTransparency = 1
+    activeCategoryLabel.Text = ""
+    activeCategoryLabel.TextSize = 22
+    activeCategoryLabel.Font = Enum.Font.Gotham
+    activeCategoryLabel.TextColor3 = Color3.fromRGB(150, 153, 163)
+    activeCategoryLabel.TextXAlignment = Enum.TextXAlignment.Left
+    activeCategoryLabel.Parent = mainFrame
 
-	slashLabel = Instance.new("TextLabel")
-	slashLabel.Size = UDim2.new(0, 20, 0, 50)
-	slashLabel.Position = UDim2.new(0.5, -205, 0.5, -280)
-	slashLabel.BackgroundTransparency = 1
-	slashLabel.Text = "/"
-	slashLabel.TextSize = 22
-	slashLabel.Font = Enum.Font.Gotham
-	slashLabel.TextColor3 = Color3.fromRGB(150, 153, 163)
-	slashLabel.TextXAlignment = Enum.TextXAlignment.Left
-	slashLabel.Visible = false
-	slashLabel.Parent = mainFrame
+    slashLabel = Instance.new("TextLabel")
+    slashLabel.Size = UDim2.new(0, 20, 0, 50)
+    slashLabel.Position = UDim2.new(0.5, -205, 0.5, -280)
+    slashLabel.BackgroundTransparency = 1
+    slashLabel.Text = "/"
+    slashLabel.TextSize = 22
+    slashLabel.Font = Enum.Font.Gotham
+    slashLabel.TextColor3 = Color3.fromRGB(150, 153, 163)
+    slashLabel.TextXAlignment = Enum.TextXAlignment.Left
+    slashLabel.Visible = false
+    slashLabel.Parent = mainFrame
 
-	moduleNameLabel = Instance.new("TextLabel")
-	moduleNameLabel.Size = UDim2.new(0, 300, 0, 50)
-	moduleNameLabel.Position = UDim2.new(0.5, -190, 0.5, -280)
-	moduleNameLabel.BackgroundTransparency = 1
-	moduleNameLabel.Text = ""
-	moduleNameLabel.TextSize = 22
-	moduleNameLabel.Font = Enum.Font.Gotham
-	moduleNameLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
-	moduleNameLabel.TextXAlignment = Enum.TextXAlignment.Left
-	moduleNameLabel.Parent = mainFrame
+    moduleNameLabel = Instance.new("TextLabel")
+    moduleNameLabel.Size = UDim2.new(0, 300, 0, 50)
+    moduleNameLabel.Position = UDim2.new(0.5, -190, 0.5, -280)
+    moduleNameLabel.BackgroundTransparency = 1
+    moduleNameLabel.Text = ""
+    moduleNameLabel.TextSize = 22
+    moduleNameLabel.Font = Enum.Font.Gotham
+    moduleNameLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
+    moduleNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    moduleNameLabel.Parent = mainFrame
 
-	local UmbrellaIcon = Instance.new("ImageLabel")
-	UmbrellaIcon.Size = UDim2.new(0, 50, 0, 50)
-	UmbrellaIcon.Position = UDim2.new(0.5, -435, 0.5, -290)
-	UmbrellaIcon.BackgroundTransparency = 1
-	UmbrellaIcon.Image = "http://www.roblox.com/asset/?id=95285379105237"
-	UmbrellaIcon.Parent = mainFrame
-	
-	local function addCategory(icon, name)
-		local categoryButton = Instance.new("Frame")
-		categoryButton.Size = UDim2.new(0, 50, 0, 50)
-		categoryButton.Position = UDim2.new(0, 5, 0, 5)
-		categoryButton.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-		categoryButton.BorderSizePixel = 0
-		categoryButton.Parent = categoryList
+    local UmbrellaIcon = Instance.new("ImageLabel")
+    UmbrellaIcon.Size = UDim2.new(0, 50, 0, 50)
+    UmbrellaIcon.Position = UDim2.new(0.5, -435, 0.5, -290)
+    UmbrellaIcon.BackgroundTransparency = 1
+    UmbrellaIcon.Image = "http://www.roblox.com/asset/?id=95285379105237"
+    UmbrellaIcon.Parent = mainFrame
+    
+    local function addCategory(icon, name)
+        local categoryButton = Instance.new("Frame")
+        categoryButton.Size = UDim2.new(0, 50, 0, 50)
+        categoryButton.Position = UDim2.new(0, 5, 0, 5)
+        categoryButton.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+        categoryButton.BorderSizePixel = 0
+        categoryButton.Parent = categoryList
 
-		local categoryCorner = Instance.new("UICorner")
-		categoryCorner.CornerRadius = UDim.new(0, 8)
-		categoryCorner.Parent = categoryButton
+        local categoryCorner = Instance.new("UICorner")
+        categoryCorner.CornerRadius = UDim.new(0, 8)
+        categoryCorner.Parent = categoryButton
 
-		local iconImage = Instance.new("ImageLabel")
-		iconImage.Size = UDim2.new(0, 30, 0, 30)
-		iconImage.Position = UDim2.new(0.5, -15, 0.5, -15)
-		iconImage.BackgroundTransparency = 1
-		iconImage.Image = icon
-		iconImage.ImageColor3 = Color3.fromRGB(150, 150, 150)
-		iconImage.Parent = categoryButton
+        local iconImage = Instance.new("ImageLabel")
+        iconImage.Size = UDim2.new(0, 30, 0, 30)
+        iconImage.Position = UDim2.new(0.5, -15, 0.5, -15)
+        iconImage.BackgroundTransparency = 1
+        iconImage.Image = icon
+        iconImage.ImageColor3 = Color3.fromRGB(150, 150, 150)
+        iconImage.Parent = categoryButton
 
-		local redLine = Instance.new("Frame")
-		redLine.Size = UDim2.new(0, 2, 0, 0)
-		redLine.Position = UDim2.new(0, 0, 0.5, 0)
-		redLine.AnchorPoint = Vector2.new(0, 0.5)
-		redLine.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
-		redLine.Transparency = 1
-		redLine.Parent = categoryButton
+        local redLine = Instance.new("Frame")
+        redLine.Size = UDim2.new(0, 2, 0, 0)
+        redLine.Position = UDim2.new(0, 0, 0.5, 0)
+        redLine.AnchorPoint = Vector2.new(0, 0.5)
+        redLine.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
+        redLine.Transparency = 1
+        redLine.Parent = categoryButton
 
-		local clickDetector = Instance.new("TextButton")
-		clickDetector.Size = UDim2.new(1, 0, 1, 0)
-		clickDetector.BackgroundTransparency = 1
-		clickDetector.Text = ""
-		clickDetector.Parent = categoryButton
+        local clickDetector = Instance.new("TextButton")
+        clickDetector.Size = UDim2.new(1, 0, 1, 0)
+        clickDetector.BackgroundTransparency = 1
+        clickDetector.Text = ""
+        clickDetector.Parent = categoryButton
 
-		clickDetector.MouseEnter:Connect(function()
-			if activeCategory ~= categoryButton then
-				tweenColor(iconImage, "ImageColor3", Color3.fromRGB(200, 200, 200), 0.15)
-			end
-		end)
+        clickDetector.MouseEnter:Connect(function()
+            if activeCategory ~= categoryButton then
+                tweenColor(iconImage, "ImageColor3", Color3.fromRGB(200, 200, 200), 0.15)
+            end
+        end)
 
-		clickDetector.MouseLeave:Connect(function()
-			if activeCategory ~= categoryButton then
-				tweenColor(iconImage, "ImageColor3", Color3.fromRGB(150, 150, 150), 0.15)
-			end
-		end)
+        clickDetector.MouseLeave:Connect(function()
+            if activeCategory ~= categoryButton then
+                tweenColor(iconImage, "ImageColor3", Color3.fromRGB(150, 150, 150), 0.15)
+            end
+        end)
 
-		clickDetector.MouseButton1Click:Connect(function()
-			if activeCategory == categoryButton then return end
+        clickDetector.MouseButton1Click:Connect(function()
+            if activeCategory == categoryButton then return end
 
-			if activeCategory then
-				local prevIcon = activeCategory:FindFirstChild("ImageLabel")
-				local prevLine = activeCategory:FindFirstChild("Frame")
+            if activeCategory then
+                local prevIcon = activeCategory:FindFirstChild("ImageLabel")
+                local prevLine = activeCategory:FindFirstChild("Frame")
 
-				if prevIcon then
-					tweenColor(prevIcon, "ImageColor3", Color3.fromRGB(150, 150, 150))
-				end
-				if prevLine then
-					tweenTransparency(prevLine, "Transparency", 1)
-					tweenSize(prevLine, "Size", UDim2.new(0, 2, 0, 0))
-				end
-				tweenColor(activeCategory, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
-			end
+                if prevIcon then
+                    tweenColor(prevIcon, "ImageColor3", Color3.fromRGB(150, 150, 150))
+                end
+                if prevLine then
+                    tweenTransparency(prevLine, "Transparency", 1)
+                    tweenSize(prevLine, "Size", UDim2.new(0, 2, 0, 0))
+                end
+                tweenColor(activeCategory, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
+            end
 
-			activeCategory = categoryButton
-			moduleSystem.activeCategory = name
+            activeCategory = categoryButton
+            moduleSystem.activeCategory = name
 
-			tweenColor(categoryButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
-			tweenColor(iconImage, "ImageColor3", Color3.fromRGB(255, 75, 75))
+            tweenColor(categoryButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
+            tweenColor(iconImage, "ImageColor3", Color3.fromRGB(255, 75, 75))
 
-			redLine.Transparency = 0
-			tweenSize(redLine, "Size", UDim2.new(0, 2, 0, 20))
+            redLine.Transparency = 0
+            tweenSize(redLine, "Size", UDim2.new(0, 2, 0, 20))
 
-			activeCategoryLabel.Text = name
-			slashLabel.Visible = false
-			moduleNameLabel.Text = ""
+            activeCategoryLabel.Text = name
+            slashLabel.Visible = false
+            moduleNameLabel.Text = ""
 
-			updateModuleList(moduleList, name)
-		end)
-	end
+            updateModuleList(moduleList, name)
+        end)
+    end
 
-	addCategory("http://www.roblox.com/asset/?id=103577523623326", "Combat")
-	addCategory("http://www.roblox.com/asset/?id=136613041915472", "World")
-	addCategory("http://www.roblox.com/asset/?id=85568792810849", "Player")
-	addCategory("http://www.roblox.com/asset/?id=124280107087786", "Utility")
-	addCategory("http://www.roblox.com/asset/?id=109730932565942", "Farm")
-	
-	local settingsContainer = Instance.new("Frame")
-	settingsContainer.Name = "SettingsContainer"
-	settingsContainer.Size = UDim2.new(0, 615, 1, -110)
-	settingsContainer.Position = UDim2.new(0, 257, 0, 90)
-	settingsContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-	settingsContainer.BackgroundTransparency = 1
-	settingsContainer.Parent = mainFrame
+    addCategory("http://www.roblox.com/asset/?id=103577523623326", "Combat")
+    addCategory("http://www.roblox.com/asset/?id=136613041915472", "World")
+    addCategory("http://www.roblox.com/asset/?id=85568792810849", "Player")
+    addCategory("http://www.roblox.com/asset/?id=124280107087786", "Utility")
+    addCategory("http://www.roblox.com/asset/?id=109730932565942", "Farm")
+    
+    local settingsContainer = Instance.new("Frame")
+    settingsContainer.Name = "SettingsContainer"
+    settingsContainer.Size = UDim2.new(0, 615, 0, 0)
+    settingsContainer.Position = UDim2.new(0, 257, 0, 90)
+    settingsContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+    settingsContainer.BackgroundTransparency = 1
+    settingsContainer.Parent = mainFrame
 
-	local settingsCorner = Instance.new("UICorner")
-	settingsCorner.CornerRadius = UDim.new(0, 8)
-	settingsCorner.Parent = settingsContainer
+    local settingsCorner = Instance.new("UICorner")
+    settingsCorner.CornerRadius = UDim.new(0, 8)
+    settingsCorner.Parent = settingsContainer
 
-	_G.mainFrame = mainFrame
+    _G.mainFrame = mainFrame
 end
-
-
 
 local function init(config)
     if config and config.moduleSystem then
@@ -1044,7 +1140,7 @@ local function init(config)
     if config and config.moduleSettings then
         for k,v in pairs(config.moduleSettings) do
             API.settings[k] = v
-            moduleSettings[k] = v -- Дублируем для совместимости
+            moduleSettings[k] = v
         end
     end
 
@@ -1052,6 +1148,6 @@ local function init(config)
 end
 
 return {
-	init = init,
-	api = API
+    init = init,
+    api = API
 }
