@@ -1,4 +1,3 @@
-
 local settings = _G.SilentAimSettings or {
     FOV = 100,
     ShowFOVCircle = true,
