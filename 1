@@ -716,13 +716,13 @@ local function showModuleSettings(moduleName)
         
         if setting.type == "slider" then
             local slider = createSlider(container, setting, UDim2.new(0, 0, 0, yOffset))
-            yOffset = yOffset + 45
+            yOffset = yOffset + 30
         elseif setting.type == "toggle" then
             local toggle = createToggle(container, setting, UDim2.new(0, 0, 0, yOffset))
-            yOffset = yOffset + 45
+            yOffset = yOffset + 30
         elseif setting.type == "textfield" then
             local textField = createTextField(container, setting, UDim2.new(0, 0, 0, yOffset))
-            yOffset = yOffset + 45
+            yOffset = yOffset + 30
         elseif setting.type == "dropdown" then
             local dropDown = createDropDown(container, setting, UDim2.new(0, 0, 0, yOffset))
             yOffset = yOffset + 45
