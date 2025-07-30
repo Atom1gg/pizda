@@ -3,9 +3,9 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
-local RootPart = Character:WaitForChild("HumanoidRootPart")
+local Character
+local Humanoid
+local RootPart
 
 local BodyVelocity = Instance.new("BodyVelocity")
 BodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
@@ -18,9 +18,32 @@ local Settings = {
     EdgeJump = false
 }
 
+local Jitter = false
+local Connection
+
+-- Функция для обновления ссылок на персонажа
+local function UpdateCharacter()
+    Character = LocalPlayer.Character
+    if Character then
+        Humanoid = Character:WaitForChild("Humanoid")
+        RootPart = Character:WaitForChild("HumanoidRootPart")
+        return true
+    end
+    return false
+end
+
+-- Основная логика Bunny Hop
 local function BunnyHop()
-    if not Settings.Enabled or not RootPart or not Humanoid then return end
+    if not Settings.Enabled then return end
     
+    -- Если персонаж не существует или умер - пытаемся обновить ссылки
+    if not Character or not Humanoid or not RootPart or not Humanoid:IsDescendantOf(workspace) then
+        if not UpdateCharacter() then return end
+    end
+
+    -- Проверяем состояние персонажа
+    if Humanoid:GetState() == Enum.HumanoidStateType.Dead then return end
+
     BodyVelocity:Destroy()
     BodyVelocity = Instance.new("BodyVelocity")
     BodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
@@ -53,7 +76,7 @@ local function BunnyHop()
         if Humanoid:GetState() ~= Enum.HumanoidStateType.Freefall and Humanoid:GetState() ~= Enum.HumanoidStateType.Jumping then
             coroutine.wrap(function()
                 RunService.RenderStepped:Wait()
-                if Humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+                if Humanoid and Humanoid:GetState() == Enum.HumanoidStateType.Freefall then
                     Humanoid:ChangeState("Jumping")
                 end
             end)()
@@ -61,14 +84,33 @@ local function BunnyHop()
     end
 end
 
-local Connection
+-- Обработчик изменения персонажа
+local function CharacterAdded(newCharacter)
+    Character = newCharacter
+    Humanoid = newCharacter:WaitForChild("Humanoid")
+    RootPart = newCharacter:WaitForChild("HumanoidRootPart")
+end
+
+-- Включение/выключение модуля
 local function Toggle(state)
     Settings.Enabled = state
+    
     if state then
+        -- Подключаемся к текущему персонажу
+        if LocalPlayer.Character then
+            CharacterAdded(LocalPlayer.Character)
+        end
+        -- Слушаем появление нового персонажа
+        LocalPlayer.CharacterAdded:Connect(CharacterAdded)
+        -- Запускаем основной цикл
         Connection = RunService.Heartbeat:Connect(BunnyHop)
     else
+        -- Отключаем всё
         if Connection then
             Connection:Disconnect()
+            Connection = nil
+        end
+        if BodyVelocity then
             BodyVelocity:Destroy()
         end
     end
