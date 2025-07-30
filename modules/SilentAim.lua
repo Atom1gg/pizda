@@ -1,94 +1,119 @@
+-- modules/SilentAim.lua
+local module = {}
+
+-- Настройки по умолчанию
+local settings = {
+    CheckTeam = true,
+    OnlyHead = true,
+    MaxDistance = 1000,
+    Enabled = false
+}
+
+-- Основные объекты
 local CurrentCamera = workspace.CurrentCamera
-local Players = game.Players
+local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 
--- Settings
-local HeadOnly = true
+-- Кэш функций
+local Ray_new = Ray.new
+local Vector2_new = Vector2.new
+local WorldToScreenPoint = CurrentCamera.WorldToScreenPoint
+local FindFirstChild = game.FindFirstChild
+local GetPlayers = Players.GetPlayers
 
-function ClosestPlayer()
-    local MaxDist, Closest = math.huge
-    for I,V in pairs(Players:GetPlayers()) do
-        if V == LocalPlayer then continue end
-        if V.Team == LocalPlayer.Team then continue end
-        if not V.Character then continue end
-        local Head = V.Character:FindFirstChild("Head")
-        if not Head then continue end
-        local Pos, Vis = CurrentCamera:WorldToScreenPoint(Head.Position)
+-- Поиск цели
+local function FindTarget()
+    local MaxDist = settings.MaxDistance
+    local Closest = nil
+    
+    local LocalTeam = settings.CheckTeam and LocalPlayer.Team or nil
+    
+    for _, Player in ipairs(GetPlayers(Players)) do
+        if Player == LocalPlayer then continue end
+        
+        if settings.CheckTeam then
+            local PlayerTeam = Player.Team
+            if PlayerTeam and LocalTeam and PlayerTeam == LocalTeam then continue end
+        end
+        
+        local Character = Player.Character
+        if not Character then continue end
+        
+        local TargetPart
+        if settings.OnlyHead then
+            TargetPart = FindFirstChild(Character, "Head")
+        else
+            TargetPart = FindFirstChild(Character, "UpperTorso") or FindFirstChild(Character, "HumanoidRootPart")
+        end
+        
+        if not TargetPart then continue end
+        
+        local Pos, Vis = WorldToScreenPoint(CurrentCamera, TargetPart.Position)
         if not Vis then continue end
-        local MousePos, TheirPos = Vector2.new(Mouse.X, Mouse.Y), Vector2.new(Pos.X, Pos.Y)
+        
+        local MousePos = Vector2_new(Mouse.X, Mouse.Y)
+        local TheirPos = Vector2_new(Pos.X, Pos.Y)
         local Dist = (TheirPos - MousePos).Magnitude
+        
         if Dist < MaxDist then
             MaxDist = Dist
-            Closest = V
+            Closest = {Player = Player, Part = TargetPart}
         end
     end
+    
     return Closest
 end
 
+-- Хук метатаблицы
 local MT = getrawmetatable(game)
 local OldNC = MT.__namecall
 local OldIDX = MT.__index
-setreadonly(MT, false)
 
-MT.__namecall = newcclosure(function(self, ...)
-    local Args, Method = {...}, getnamecallmethod()
-    if Method == "FindPartOnRayWithIgnoreList" and not checkcaller() then
-        local CP = ClosestPlayer()
-        if CP and CP.Character then
-            local TargetPart = CP.Character:FindFirstChild("Head") or (not HeadOnly and CP.Character:FindFirstChild("HumanoidRootPart"))
-            if TargetPart then
-                Args[1] = Ray.new(CurrentCamera.CFrame.Position, (TargetPart.Position - CurrentCamera.CFrame.Position).Unit * 1000)
+local function Hook()
+    setreadonly(MT, false)
+    
+    MT.__namecall = newcclosure(function(self, ...)
+        local Args = {...}
+        local Method = getnamecallmethod()
+        
+        if settings.Enabled and Method == "FindPartOnRayWithIgnoreList" and not checkcaller() then
+            local Target = FindTarget()
+            
+            if Target and Target.Part then
+                local RayOrigin = CurrentCamera.CFrame.Position
+                local RayDirection = (Target.Part.Position - RayOrigin).Unit * settings.MaxDistance
+                Args[1] = Ray_new(RayOrigin, RayDirection)
                 return OldNC(self, unpack(Args))
             end
         end
-    end
-    return OldNC(self, ...)
-end)
-
-MT.__index = newcclosure(function(self, K)
-    if K == "Clips" then
-        return workspace.Map
-    end
-    return OldIDX(self, K)
-end)
-
-setreadonly(MT, true)
-
-return {
-    Toggle = function(state)
-        if not state then
-            setreadonly(MT, false)
-            MT.__namecall = OldNC
-            MT.__index = OldIDX
-            setreadonly(MT, true)
-        else
-            setreadonly(MT, false)
-            MT.__namecall = newcclosure(function(self, ...)
-                local Args, Method = {...}, getnamecallmethod()
-                if Method == "FindPartOnRayWithIgnoreList" and not checkcaller() then
-                    local CP = ClosestPlayer()
-                    if CP and CP.Character then
-                        local TargetPart = CP.Character:FindFirstChild("Head") or (not HeadOnly and CP.Character:FindFirstChild("HumanoidRootPart"))
-                        if TargetPart then
-                            Args[1] = Ray.new(CurrentCamera.CFrame.Position, (TargetPart.Position - CurrentCamera.CFrame.Position).Unit * 1000)
-                            return OldNC(self, unpack(Args))
-                        end
-                    end
-                end
-                return OldNC(self, ...)
-            end)
-            MT.__index = newcclosure(function(self, K)
-                if K == "Clips" then
-                    return workspace.Map
-                end
-                return OldIDX(self, K)
-            end)
-            setreadonly(MT, true)
-        end
-    end,
+        
+        return OldNC(self, ...)
+    end)
     
-    SetHeadOnly = function(state)
-        HeadOnly = state
-    end
-}
+    setreadonly(MT, true)
+end
+
+-- API модуля
+function module.Enable()
+    settings.Enabled = true
+    Hook()
+end
+
+function module.Disable()
+    settings.Enabled = false
+end
+
+function module.SetTeamCheck(value)
+    settings.CheckTeam = value
+end
+
+function module.SetOnlyHead(value)
+    settings.OnlyHead = value
+end
+
+function module.SetMaxDistance(value)
+    settings.MaxDistance = value
+end
+
+return module
