@@ -1,42 +1,51 @@
-local module = {}
-local enabled = false
-local spinSpeed = 20 -- Скорость вращения (градусов в кадр)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
--- Локальные переменные
-local camera = workspace.CurrentCamera
-local runService = game:GetService("RunService")
-local spinConnection = nil
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
 
--- Основная функция вращения
-local function spinCharacter()
-    if not enabled then return end
+local Settings = {
+    Enabled = false,
+    Speed = 20, -- Скорость вращения (градусы в секунду)
+    Angle = 0,
+    AntiAim = true -- Наклон головы (можно отключить)
+}
+
+local function Spin()
+    if not Settings.Enabled or not RootPart then return end
     
-    local character = game.Players.LocalPlayer.Character
-    if character and character:FindFirstChild("HumanoidRootPart") then
-        local rootPart = character.HumanoidRootPart
-        rootPart.CFrame = rootPart.CFrame * CFrame.Angles(0, math.rad(spinSpeed), 0)
+    Settings.Angle = (Settings.Angle + Settings.Speed) % 360
+    
+    local CFrameSpin = CFrame.new(RootPart.Position) * CFrame.Angles(0, math.rad(Settings.Angle), 0)
+    
+    if Settings.AntiAim then
+        -- Наклон головы (можно настроить под себя)
+        CFrameSpin = CFrameSpin * CFrame.Angles(math.rad(-90), 0, 0)
     end
+    
+    RootPart.CFrame = CFrameSpin
 end
 
--- Включение/выключение
-function module.Toggle(state)
-    enabled = state
-    
-    if enabled then
-        -- Создаем соединение для вращения
-        spinConnection = runService.RenderStepped:Connect(spinCharacter)
+local Connection
+local function Toggle(state)
+    Settings.Enabled = state
+    if state then
+        Connection = RunService.Heartbeat:Connect(Spin)
     else
-        -- Отключаем вращение
-        if spinConnection then
-            spinConnection:Disconnect()
-            spinConnection = nil
+        if Connection then
+            Connection:Disconnect()
+            -- Возвращаем нормальный поворот
+            if RootPart then
+                RootPart.CFrame = CFrame.new(RootPart.Position, RootPart.Position + Vector3.new(0, 0, -1))
+            end
         end
     end
 end
 
--- Настройка скорости
-function module.SetSpeed(value)
-    spinSpeed = value
-end
-
-return module
+return {
+    Toggle = Toggle,
+    SetSpeed = function(value) Settings.Speed = value end,
+    SetAntiAim = function(state) Settings.AntiAim = state end
+}
