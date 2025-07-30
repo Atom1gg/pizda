@@ -2,14 +2,14 @@ local function ChamsModule()
     local module = {
         enabled = false,
         teamBased = true,
-        refreshInterval = 1, -- Обновлять каждую секунду
+        refreshInterval = 1,
         teamColors = {
-            ["Terrorists"] = Color3.fromRGB(255, 200, 0),  -- Желтый для T
-            ["Counter-Terrorists"] = Color3.fromRGB(0, 150, 255),  -- Синий для CT
-            defaultEnemy = Color3.fromRGB(255, 0, 0)  -- Красный для неизвестных команд
+            ["Terrorists"] = Color3.fromRGB(255, 200, 0),
+            ["Counter-Terrorists"] = Color3.fromRGB(0, 150, 255),
+            defaultEnemy = Color3.fromRGB(255, 0, 0)
         },
-        outlineColor = Color3.fromRGB(255, 255, 255),  -- Белая обводка
-        fillTransparency = 0.8,  -- Прозрачность
+        outlineColor = Color3.fromRGB(255, 255, 255),
+        fillTransparency = 0.8,
         refreshConnection = nil,
         playerConnections = {}
     }
@@ -17,33 +17,22 @@ local function ChamsModule()
     local function applyChams(player)
         if not player or not player.Character then return end
         
-        local success, _ = pcall(function()
-            local character = player.Character
-            local teamColor
-            
-            if module.teamBased and player.Team then
-                teamColor = module.teamColors[player.Team.Name] or module.teamColors.defaultEnemy
-            else
-                teamColor = module.teamColors.defaultEnemy
-            end
-            
-            local highlight = character:FindFirstChildOfClass("Highlight")
-            if not highlight then
-                highlight = Instance.new("Highlight")
-                highlight.Parent = character
-            end
-            
-            highlight.OutlineColor = module.outlineColor
-            highlight.FillColor = teamColor
-            highlight.FillTransparency = module.fillTransparency
-            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            highlight.Enabled = module.enabled
-        end)
+        local highlight = player.Character:FindFirstChildOfClass("Highlight")
+        if not highlight then
+            highlight = Instance.new("Highlight")
+            highlight.Parent = player.Character
+        end
+        
+        highlight.OutlineColor = module.outlineColor
+        highlight.FillColor = module.teamBased and 
+                            (player.Team and module.teamColors[player.Team.Name] or module.teamColors.defaultEnemy) or 
+                            module.teamColors.defaultEnemy
+        highlight.FillTransparency = module.fillTransparency
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.Enabled = module.enabled -- Важно: используем текущее состояние
     end
 
     local function refreshAllPlayers()
-        if not module.enabled then return end
-        
         for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
             if player ~= game.Players.LocalPlayer then
                 applyChams(player)
@@ -54,25 +43,21 @@ local function ChamsModule()
     local function setupPlayer(player)
         if player == game.Players.LocalPlayer then return end
         
-        -- Удаляем старые соединения, если они есть
         if module.playerConnections[player] then
             for _, conn in pairs(module.playerConnections[player]) do
                 conn:Disconnect()
             end
-            module.playerConnections[player] = nil
         end
         
-        module.playerConnections[player] = {}
-        
-        -- Добавляем новые соединения
-        table.insert(module.playerConnections[player], player.CharacterAdded:Connect(function()
-            repeat task.wait() until player.Character and player.Character:FindFirstChild("Humanoid")
-            applyChams(player)
-        end))
-        
-        table.insert(module.playerConnections[player], player:GetPropertyChangedSignal("Team"):Connect(function()
-            applyChams(player)
-        end))
+        module.playerConnections[player] = {
+            player.CharacterAdded:Connect(function(character)
+                repeat task.wait() until character:FindFirstChild("Humanoid")
+                applyChams(player)
+            end),
+            player:GetPropertyChangedSignal("Team"):Connect(function()
+                applyChams(player)
+            end)
+        }
         
         if player.Character then
             applyChams(player)
@@ -80,7 +65,6 @@ local function ChamsModule()
     end
 
     local function init()
-        -- Настройка автообновления
         if module.refreshConnection then
             module.refreshConnection:Disconnect()
         end
@@ -89,41 +73,26 @@ local function ChamsModule()
             refreshAllPlayers()
         end)
         
-        -- Настройка игроков
         for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
             setupPlayer(player)
         end
-        
-        game:GetService("Players").PlayerAdded:Connect(setupPlayer)
-        
-        game:GetService("Players").PlayerRemoving:Connect(function(player)
-            if module.playerConnections[player] then
-                for _, conn in pairs(module.playerConnections[player]) do
-                    conn:Disconnect()
-                end
-                module.playerConnections[player] = nil
-            end
-        end)
     end
 
-    local function Enable()
-        if module.enabled then return end
-        module.enabled = true
-        init()
-        refreshAllPlayers()
-    end
-
-    local function Disable()
-        if not module.enabled then return end
-        module.enabled = false
-        
+    local function cleanup()
         if module.refreshConnection then
             module.refreshConnection:Disconnect()
             module.refreshConnection = nil
         end
         
+        for player, connections in pairs(module.playerConnections) do
+            for _, conn in pairs(connections) do
+                conn:Disconnect()
+            end
+        end
+        module.playerConnections = {}
+        
         for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
-            if player ~= game.Players.LocalPlayer and player.Character then
+            if player.Character then
                 local highlight = player.Character:FindFirstChildOfClass("Highlight")
                 if highlight then
                     highlight.Enabled = false
@@ -134,17 +103,28 @@ local function ChamsModule()
 
     return {
         Toggle = function(state)
+            if state == module.enabled then return end
+            
+            module.enabled = state
             if state then
-                Enable()
+                init()
             else
-                Disable()
+                cleanup()
             end
         end,
         SetTeamBased = function(state)
             module.teamBased = state
-            refreshAllPlayers()
+            if module.enabled then
+                refreshAllPlayers()
+            end
         end,
-        enabled = module.enabled
+        SetTransparency = function(value)
+            module.fillTransparency = value
+            if module.enabled then
+                refreshAllPlayers()
+            end
+        end,
+        enabled = function() return module.enabled end
     }
 end
 
