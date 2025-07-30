@@ -1,158 +1,84 @@
-local function AutoBhopModule()
-    local module = {
-        enabled = false,
-        jumpPower = 30,
-        maxSpeed = 120,
-        strafePower = 15,
-        groundCheckOffset = Vector3.new(0, -1.5, 0),
-        groundCheckRadius = 1,
-        jumpCooldown = 0.2,
-        lastJumpTime = 0
-    }
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
-    -- Локальные переменные
-    local player = game:GetService("Players").LocalPlayer
-    local character, humanoid, rootPart
-    local runService = game:GetService("RunService")
-    local inputService = game:GetService("UserInputService")
-    local physicsService = game:GetService("PhysicsService")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
 
-    -- Физические параметры
-    local currentSpeed = 0
-    local lastYaw = 0
-    local isOnGround = false
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+local BodyVelocity = Instance.new("BodyVelocity")
+BodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
+BodyVelocity.P = 1000
 
-    -- Инициализация персонажа
-    local function initCharacter()
-        character = player.Character or player.CharacterAdded:Wait()
-        humanoid = character:WaitForChild("Humanoid")
-        rootPart = character:WaitForChild("HumanoidRootPart")
-        
-        -- Настройка фильтра лучей
-        raycastParams.FilterDescendantsInstances = {character}
-        
-        -- Сохраняем оригинальные параметры
-        if not module.originalJumpPower then
-            module.originalJumpPower = humanoid.JumpPower
-        end
-        if not module.originalWalkSpeed then
-            module.originalWalkSpeed = humanoid.WalkSpeed
-        end
-    end
+local Settings = {
+    Enabled = false,
+    Speed = 30,
+    Direction = "directional", -- "directional", "directional 2", "forward"
+    EdgeJump = false
+}
 
-    -- Проверка нахождения на земле
-    local function checkGround()
-        if not rootPart then return false end
-        local rayOrigin = rootPart.Position
-        local rayDirection = module.groundCheckOffset
-        local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-        
-        if raycastResult then
-            local normal = raycastResult.Normal
-            return normal.Y > 0.7 -- Угол нормали для определения "земли"
-        end
-        return false
-    end
+local Jitter = false
 
-    -- Основная логика BHop
-    local function updateBHop(dt)
-        if not humanoid or not rootPart then return end
-        
-        -- Обновляем состояние нахождения на земле
-        isOnGround = checkGround()
-        
-        -- Получаем направление движения
-        local moveDirection = humanoid.MoveDirection
-        local isMoving = moveDirection.Magnitude > 0
-        
-        -- Физика ускорения
-        if isMoving and isOnGround then
-            local yaw = math.atan2(moveDirection.X, moveDirection.Z)
-            local yawDelta = (yaw - lastYaw + math.pi) % (2 * math.pi) - math.pi
-            
-            -- Ускорение при страфе
-            if math.abs(yawDelta) > 0.1 then
-                currentSpeed = math.min(currentSpeed + module.strafePower * math.abs(yawDelta), module.maxSpeed)
-            else
-                currentSpeed = math.max(currentSpeed - 5, module.originalWalkSpeed or 16)
-            end
-            
-            lastYaw = yaw
-        elseif not isOnGround then
-            currentSpeed = math.max(currentSpeed - 2, module.originalWalkSpeed or 16)
+local function BunnyHop()
+    if not Settings.Enabled or not RootPart or not Humanoid then return end
+    
+    BodyVelocity:Destroy()
+    BodyVelocity = Instance.new("BodyVelocity")
+    BodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
+    
+    -- Bunny Hop Logic
+    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+        local add = 0
+        if Settings.Direction == "directional" or Settings.Direction == "directional 2" then
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then add = 90 end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then add = 180 end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then add = 270 end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) and UserInputService:IsKeyDown(Enum.KeyCode.W) then add = 45 end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) and UserInputService:IsKeyDown(Enum.KeyCode.W) then add = 315 end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) and UserInputService:IsKeyDown(Enum.KeyCode.S) then add = 225 end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) and UserInputService:IsKeyDown(Enum.KeyCode.S) then add = 145 end
         end
         
-        -- Применяем скорость
-        humanoid.WalkSpeed = currentSpeed
+        local rot = CFrame.new(RootPart.Position, RootPart.Position + RootPart.CFrame.LookVector) * CFrame.Angles(0, math.rad(add), 0)
+        BodyVelocity.Parent = RootPart
+        Humanoid.Jump = true
+        BodyVelocity.Velocity = Vector3.new(rot.LookVector.X, 0, rot.LookVector.Z) * Settings.Speed
         
-        -- Автопрыжок
-        if isOnGround and (os.clock() - module.lastJumpTime) > module.jumpCooldown then
-            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-            module.lastJumpTime = os.clock()
+        if add == 0 and Settings.Direction == "directional" and not UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            BodyVelocity:Destroy()
         end
     end
-
-    -- Включение/выключение
-    local function enable()
-        if module.enabled then return end
-        
-        initCharacter()
-        humanoid.JumpPower = module.jumpPower
-        
-        module.connection = runService.Heartbeat:Connect(updateBHop)
-        module.enabled = true
+    
+    -- Edge Jump Logic
+    if Settings.EdgeJump then
+        if Humanoid:GetState() ~= Enum.HumanoidStateType.Freefall and Humanoid:GetState() ~= Enum.HumanoidStateType.Jumping then
+            coroutine.wrap(function()
+                RunService.RenderStepped:Wait()
+                if Humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+                    Humanoid:ChangeState("Jumping")
+                end
+            end)()
+        end
     end
-
-    local function disable()
-        if not module.enabled then return end
-        
-        if module.connection then
-            module.connection:Disconnect()
-        end
-        
-        if humanoid then
-            humanoid.WalkSpeed = module.originalWalkSpeed or 16
-            humanoid.JumpPower = module.originalJumpPower or 50
-        end
-        
-        module.enabled = false
-    end
-
-    return {
-        Toggle = function(state)
-            if state then
-                enable()
-            else
-                disable()
-            end
-        end,
-        
-        SetJumpPower = function(value)
-            module.jumpPower = value
-            if humanoid and module.enabled then
-                humanoid.JumpPower = value
-            end
-        end,
-        
-        SetMaxSpeed = function(value)
-            module.maxSpeed = value
-        end,
-        
-        SetStrafePower = function(value)
-            module.strafePower = value
-        end,
-        
-        SetGroundCheck = function(offset, radius)
-            module.groundCheckOffset = offset or Vector3.new(0, -1.5, 0)
-            module.groundCheckRadius = radius or 1
-        end,
-        
-        enabled = function()
-            return module.enabled
-        end
-    }
 end
 
-return AutoBhopModule()
+local Connection
+local function Toggle(state)
+    Settings.Enabled = state
+    if state then
+        Connection = RunService.Heartbeat:Connect(BunnyHop)
+    else
+        if Connection then
+            Connection:Disconnect()
+            BodyVelocity:Destroy()
+        end
+    end
+end
+
+return {
+    Toggle = Toggle,
+    SetSpeed = function(value) Settings.Speed = value end,
+    SetDirection = function(value) Settings.Direction = value end,
+    SetEdgeJump = function(state) Settings.EdgeJump = state end
+}
