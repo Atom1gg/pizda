@@ -1,0 +1,499 @@
+local function Main()
+	-- Все модули с raw-ссылками
+	local MODULE_URLS = {
+		AutoBhop = 'https://raw.githubusercontent.com/Atom1gg/pizda/main/modules/AutoBhop.lua',
+		ThirdPerson = 'https://raw.githubusercontent.com/Atom1gg/pizda/main/modules/ThirdPerson.lua',
+		ChangeFOV = 'https://raw.githubusercontent.com/Atom1gg/pizda/main/modules/ChangeFov.lua',
+		BombESP = 'https://raw.githubusercontent.com/Atom1gg/pizda/main/modules/BombEsp.lua',
+		FastPlant = 'https://raw.githubusercontent.com/Atom1gg/pizda/main/modules/FastPlant.lua',
+		QuickDefuse = 'https://raw.githubusercontent.com/Atom1gg/pizda/main/modules/QuickDefuse.lua',
+		Spinbot = 'https://raw.githubusercontent.com/Atom1gg/pizda/main/modules/Spinbot.lua',
+		SilentAim = 'https://raw.githubusercontent.com/Atom1gg/pizda/main/modules/SilentAim.lua',
+		Chams = 'https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/modules/Chams.lua',
+		KillSay = 'https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/modules/KillSay',
+		GrenadeTrajectory = 'https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/modules/GrenadeTrajectory',
+		ESP = 'https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/modules/ESP',
+	}
+
+	-- Загрузка UI библиотеки
+	local UI_LIB_URL = 'https://github.com/Atom1gg/pizda/raw/refs/heads/main/1'
+	local uiLib = loadstring(game:HttpGet(UI_LIB_URL))()
+
+	-- Инициализация всех модулей
+	local modules = {
+		AutoBhop = { instance = nil, enabled = false },
+		ThirdPerson = { instance = nil, enabled = false },
+		ChangeFOV = { instance = nil, enabled = false },
+		BombESP = { instance = nil, enabled = false },
+		FastPlant = { instance = nil, enabled = false },
+		QuickDefuse = { instance = nil, enabled = false },
+		Spinbot = { instance = nil, enabled = false },
+		GrenadeTrajectory = { instance = nil, enabled = false },
+		KillSay = { instance = nil, enabled = false },
+		ESP = { instance = nil, enabled = false },
+		SilentAim = {
+			instance = nil,
+			enabled = false,
+			settings = {
+				TeamCheck = true,
+				OnlyHead = true,
+				MaxDistance = 1000,
+			},
+		},
+		Chams = { instance = nil, enabled = false },
+	}
+
+	-- Функция загрузки модуля (без изменений)
+	local function LoadModule(moduleName)
+		if modules[moduleName].instance then
+			return true
+		end
+
+		local success, module = pcall(function()
+			return loadstring(game:HttpGet(MODULE_URLS[moduleName]))()
+		end)
+
+		if success then
+			modules[moduleName].instance = module
+			return true
+		else
+			warn('Ошибка загрузки ' .. moduleName .. ':', module)
+			return false
+		end
+	end
+
+	local function ToggleModule(moduleName, state)
+		if not modules[moduleName].instance and not LoadModule(moduleName) then
+			return false
+		end
+
+		if moduleName == 'SilentAim' then
+			modules.SilentAim.instance.Toggle(state) -- Просто включаем/выключаем
+			if state then
+				-- Применяем настройки только при включении
+				modules.SilentAim.instance.SetTeamCheck(
+					modules.SilentAim.settings.TeamCheck
+				)
+				modules.SilentAim.instance.SetOnlyHead(
+					modules.SilentAim.settings.OnlyHead
+				)
+				modules.SilentAim.instance.SetMaxDistance(
+					modules.SilentAim.settings.MaxDistance
+				)
+			end
+		else
+			pcall(function()
+				modules[moduleName].instance.Toggle(state)
+			end)
+		end
+
+		modules[moduleName].enabled = state
+		return true
+	end
+
+	-- Все модули и их настройки (с добавлением SilentAim)
+	local UI_API = {
+		modules = {
+			Movement = {},
+			Player = {
+				{
+					name = 'Auto Bhop',
+					enabled = false,
+					callback = function(s)
+						ToggleModule('AutoBhop', s)
+					end,
+				},
+				{
+					name = 'FOV Changer',
+					enabled = false,
+					callback = function(s)
+						ToggleModule('ChangeFOV', s)
+					end,
+				},
+				{
+					name = 'Fast Plant',
+					enabled = false,
+					callback = function(s)
+						ToggleModule('FastPlant', s)
+					end,
+				},
+				{
+					name = 'Quick Defuse',
+					enabled = false,
+					callback = function(s)
+						ToggleModule('QuickDefuse', s)
+					end,
+				},
+				{
+					name = 'Third Person',
+					enabled = false,
+					callback = function(s)
+						ToggleModule('ThirdPerson', s)
+					end,
+				},
+				{
+					name = 'Spinbot',
+					enabled = false,
+					callback = function(s)
+						ToggleModule('Spinbot', s)
+					end,
+				},
+			},
+			World = {
+				{
+					name = 'ESP',
+					enabled = false,
+					callback = function(s)
+						ToggleModule('ESP', s)
+					end,
+				},
+				{
+					name = 'Bomb ESP',
+					enabled = false,
+					callback = function(s)
+						ToggleModule('BombESP', s)
+					end,
+				},
+				{
+					name = 'Chams',
+					enabled = false,
+					callback = function(s)
+						ToggleModule('Chams', s)
+					end,
+				},
+			},
+			Utility = {
+				{
+					name = 'Kill Say',
+					enabled = false,
+					callback = function(s)
+						ToggleModule('KillSay', s)
+					end,
+				},
+				{
+					name = 'Grenade Trajectory',
+					enabled = false,
+					callback = function(s)
+						ToggleModule('GrenadeTrajectory', s)
+					end,
+				},
+			},
+			Combat = {
+				{
+					name = 'Silent Aim',
+					enabled = false,
+					callback = function(s)
+						ToggleModule('SilentAim', s)
+					end,
+				},
+			},
+		},
+		settings = {
+			['ESP'] = {
+				settings = {
+					{
+						type = 'toggle',
+						name = 'Enabled',
+						default = false,
+						callback = function(s)
+							if modules.SkeletonESP.instance then
+								modules.SkeletonESP.instance.Toggle(s)
+							end
+						end,
+					},
+					{
+						type = 'toggle',
+						name = 'Use Team Color',
+						default = true,
+						callback = function(s)
+							if modules.SkeletonESP.instance then
+								modules.SkeletonESP.instance.SetTeamColor(s)
+							end
+						end,
+					},
+					{
+						type = 'slider',
+						name = 'Thickness',
+						min = 1,
+						max = 5,
+						default = 1,
+						callback = function(v)
+							if modules.SkeletonESP.instance then
+								modules.SkeletonESP.instance.SetThickness(v)
+							end
+						end,
+					},
+					{
+						type = 'toggle',
+						name = 'Show Weapon',
+						default = true,
+						callback = function(s)
+							if modules.SkeletonESP.instance then
+								modules.SkeletonESP.instance.SetShowWeapon(s)
+							end
+						end,
+					},
+				},
+			},
+			['Grenade Trajectory'] = {
+				settings = {
+					{
+						type = 'toggle',
+						name = 'Enabled',
+						default = false,
+						callback = function(s)
+							if modules.GrenadeTrajectory.instance then
+								modules.GrenadeTrajectory.instance.Toggle(s)
+							end
+						end,
+					},
+					{
+						type = 'slider',
+						name = 'Transparency',
+						min = 0,
+						max = 1,
+						default = 0.7,
+						increment = 0.1,
+						callback = function(value)
+							if modules.GrenadeTrajectory.instance then
+								modules.GrenadeTrajectory.instance.SetTransparency(
+									value
+								)
+							end
+						end,
+					},
+					{
+						type = 'slider',
+						name = 'Thickness',
+						min = 0.1,
+						max = 2,
+						default = 0.5,
+						increment = 0.1,
+						callback = function(value)
+							if modules.GrenadeTrajectory.instance then
+								modules.GrenadeTrajectory.instance.SetThickness(
+									value
+								)
+							end
+						end,
+					},
+				},
+			},
+			['Kill Say'] = {
+				settings = {
+					{
+						type = 'toggle',
+						name = 'Enabled',
+						default = false,
+						callback = function(s)
+							if modules.KillSay.instance then
+								modules.KillSay.instance.Toggle(s)
+							end
+						end,
+					},
+					{
+						type = 'textfield', -- Новый элемент TextBox
+						name = 'Message',
+						default = 'ez get Umbrella.hub',
+						callback = function(text)
+							if modules.KillSay.instance then
+								modules.KillSay.instance.SetMessage(text)
+							end
+						end,
+						getmethod = function()
+							return modules.KillSay.instance
+									and modules.KillSay.instance.GetMessage()
+								or ''
+						end,
+					},
+				},
+			},
+			['Silent Aim'] = {
+				settings = {
+					{
+						type = 'toggle',
+						name = 'Enabled',
+						default = false,
+						callback = function(s)
+							if modules.SilentAim.instance then
+								modules.SilentAim.instance.Toggle(s)
+							end
+						end,
+					},
+					{
+						type = 'toggle',
+						name = 'Team Check',
+						default = true,
+						callback = function(s)
+							if modules.SilentAim.instance then
+								modules.SilentAim.instance.SetTeamCheck(s)
+							end
+						end,
+					},
+					{
+						type = 'toggle',
+						name = 'Only Head',
+						default = true,
+						callback = function(s)
+							if modules.SilentAim.instance then
+								modules.SilentAim.instance.SetOnlyHead(s)
+							end
+						end,
+					},
+					{
+						type = 'slider',
+						name = 'Max Distance',
+						min = 100,
+						max = 5000,
+						default = 1000,
+						callback = function(v)
+							if modules.SilentAim.instance then
+								modules.SilentAim.instance.SetMaxDistance(v)
+							end
+						end,
+					},
+				},
+			},
+			['Auto Bhop'] = {
+				settings = {
+					{
+						type = 'toggle',
+						name = 'Enabled',
+						default = false,
+						callback = function(s)
+							if modules.AutoBhop.instance then
+								modules.AutoBhop.instance.Toggle(s)
+							end
+						end,
+					},
+					{
+						type = 'slider',
+						name = 'Speed',
+						min = 10,
+						max = 100,
+						default = 30,
+						callback = function(v)
+							if modules.AutoBhop.instance then
+								modules.AutoBhop.instance.SetSpeed(v)
+							end
+						end,
+					},
+					{
+						type = 'dropdown',
+						name = 'Direction',
+						options = {
+							'directional',
+							'directional 2',
+							'forward',
+						},
+						default = 'directional',
+						callback = function(v)
+							if modules.AutoBhop.instance then
+								modules.AutoBhop.instance.SetDirection(v)
+							end
+						end,
+					},
+					{
+						type = 'toggle',
+						name = 'Edge Jump',
+						default = false,
+						callback = function(s)
+							if modules.AutoBhop.instance then
+								modules.AutoBhop.instance.SetEdgeJump(s)
+							end
+						end,
+					},
+				},
+			},
+			['Spinbot'] = {
+				settings = {
+					{
+						type = 'toggle',
+						name = 'Enabled',
+						default = false,
+						callback = function(s)
+							if modules.Spinbot.instance then
+								modules.Spinbot.instance.Toggle(s)
+							end
+						end,
+					},
+					{
+						type = 'slider',
+						name = 'Speed',
+						min = 1,
+						max = 50,
+						default = 20,
+						callback = function(v)
+							if modules.Spinbot.instance then
+								modules.Spinbot.instance.SetSpeed(v)
+							end
+						end,
+					},
+					{
+						type = 'toggle',
+						name = 'Anti-Aim Head',
+						default = true,
+						callback = function(s)
+							if modules.Spinbot.instance then
+								modules.Spinbot.instance.SetAntiAim(s)
+							end
+						end,
+					},
+				},
+			},
+			['Chams'] = {
+				settings = {
+					{
+						type = 'toggle',
+						name = 'Enabled',
+						default = false,
+						callback = function(s)
+							if modules.Chams.instance then
+								modules.Chams.instance.Toggle(s)
+							end
+						end,
+					},
+					{
+						type = 'toggle',
+						name = 'Team Colors',
+						default = true,
+						callback = function(s)
+							if modules.Chams.instance then
+								modules.Chams.instance.SetTeamBased(s)
+							end
+						end,
+					},
+				},
+			},
+		},
+	}
+
+	-- Инициализация UI (без изменений)
+	uiLib.init({
+		moduleSystem = {
+			modules = UI_API.modules,
+			activeCategory = 'Combat',
+		},
+		moduleSettings = UI_API.settings,
+	})
+
+	-- Очистка при выходе (адаптированная)
+	game.Players.PlayerRemoving:Connect(function(player)
+		if player == game.Players.LocalPlayer then
+			for name, data in pairs(modules) do
+				if data.enabled then
+					pcall(function()
+						if name == 'SilentAim' then
+							data.instance.Disable()
+						else
+							data.instance.Toggle(false)
+						end
+					end)
+				end
+			end
+		end
+	end)
+end
+
+-- Запуск
+Main()
