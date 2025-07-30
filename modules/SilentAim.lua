@@ -23,18 +23,15 @@ local GetPlayers = Players.GetPlayers
 
 -- Поиск цели
 local function FindTarget()
+    if not settings.Enabled then return nil end
+    
     local MaxDist = settings.MaxDistance
     local Closest = nil
-    
-    local LocalTeam = settings.CheckTeam and LocalPlayer.Team or nil
     
     for _, Player in ipairs(GetPlayers(Players)) do
         if Player == LocalPlayer then continue end
         
-        if settings.CheckTeam then
-            local PlayerTeam = Player.Team
-            if PlayerTeam and LocalTeam and PlayerTeam == LocalTeam then continue end
-        end
+        if settings.CheckTeam and Player.Team == LocalPlayer.Team then continue end
         
         local Character = Player.Character
         if not Character then continue end
@@ -67,40 +64,30 @@ end
 -- Хук метатаблицы
 local MT = getrawmetatable(game)
 local OldNC = MT.__namecall
-local OldIDX = MT.__index
+setreadonly(MT, false)
 
-local function Hook()
-    setreadonly(MT, false)
+MT.__namecall = newcclosure(function(self, ...)
+    local Args = {...}
+    local Method = getnamecallmethod()
     
-    MT.__namecall = newcclosure(function(self, ...)
-        local Args = {...}
-        local Method = getnamecallmethod()
-        
-        if settings.Enabled and Method == "FindPartOnRayWithIgnoreList" and not checkcaller() then
-            local Target = FindTarget()
-            
-            if Target and Target.Part then
-                local RayOrigin = CurrentCamera.CFrame.Position
-                local RayDirection = (Target.Part.Position - RayOrigin).Unit * settings.MaxDistance
-                Args[1] = Ray_new(RayOrigin, RayDirection)
-                return OldNC(self, unpack(Args))
-            end
+    if Method == "FindPartOnRayWithIgnoreList" and not checkcaller() and settings.Enabled then
+        local Target = FindTarget()
+        if Target and Target.Part then
+            local RayOrigin = CurrentCamera.CFrame.Position
+            local RayDirection = (Target.Part.Position - RayOrigin).Unit * settings.MaxDistance
+            Args[1] = Ray_new(RayOrigin, RayDirection)
+            return OldNC(self, unpack(Args))
         end
-        
-        return OldNC(self, ...)
-    end)
+    end
     
-    setreadonly(MT, true)
-end
+    return OldNC(self, ...)
+end)
+
+setreadonly(MT, true)
 
 -- API модуля
-function module.Enable()
-    settings.Enabled = true
-    Hook()
-end
-
-function module.Disable()
-    settings.Enabled = false
+function module.Toggle(state)
+    settings.Enabled = state
 end
 
 function module.SetTeamCheck(value)
