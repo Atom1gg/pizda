@@ -15,26 +15,18 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 
--- Кэш функций
-local Ray_new = Ray.new
-local Vector2_new = Vector2.new
-local WorldToScreenPoint = CurrentCamera.WorldToScreenPoint
-local FindFirstChild = game.FindFirstChild
-local GetPlayers = Players.GetPlayers
-
 -- Поиск цели
 local function FindTarget()
+    if not settings.Enabled then return nil end
+    
     local MaxDist = settings.MaxDistance
     local Closest = nil
     
-    local LocalTeam = settings.CheckTeam and LocalPlayer.Team or nil
-    
-    for _, Player in ipairs(GetPlayers(Players)) do
+    for _, Player in ipairs(Players:GetPlayers()) do
         if Player == LocalPlayer then continue end
         
-        if settings.CheckTeam then
-            local PlayerTeam = Player.Team
-            if PlayerTeam and LocalTeam and PlayerTeam == LocalTeam then continue end
+        if settings.CheckTeam and Player.Team == LocalPlayer.Team then
+            continue
         end
         
         local Character = Player.Character
@@ -42,18 +34,20 @@ local function FindTarget()
         
         local TargetPart
         if settings.OnlyHead then
-            TargetPart = FindFirstChild(Character, "Head")
+            TargetPart = Character:FindFirstChild("Head")
         else
-            TargetPart = FindFirstChild(Character, "UpperTorso") or FindFirstChild(Character, "HumanoidRootPart")
+            TargetPart = Character:FindFirstChild("HumanoidRootPart") or 
+                        Character:FindFirstChild("UpperTorso") or
+                        Character:FindFirstChild("LowerTorso")
         end
         
         if not TargetPart then continue end
         
-        local Pos, Vis = WorldToScreenPoint(CurrentCamera, TargetPart.Position)
+        local Pos, Vis = CurrentCamera:WorldToScreenPoint(TargetPart.Position)
         if not Vis then continue end
         
-        local MousePos = Vector2_new(Mouse.X, Mouse.Y)
-        local TheirPos = Vector2_new(Pos.X, Pos.Y)
+        local MousePos = Vector2.new(Mouse.X, Mouse.Y)
+        local TheirPos = Vector2.new(Pos.X, Pos.Y)
         local Dist = (TheirPos - MousePos).Magnitude
         
         if Dist < MaxDist then
@@ -74,16 +68,21 @@ local function Hook()
     setreadonly(MT, false)
     
     MT.__namecall = newcclosure(function(self, ...)
+        if not settings.Enabled then
+            return OldNC(self, ...)
+        end
+        
         local Args = {...}
         local Method = getnamecallmethod()
         
-        if settings.Enabled and Method == "FindPartOnRayWithIgnoreList" and not checkcaller() then
+        if (Method == "FindPartOnRayWithIgnoreList" or Method == "FindPartOnRay") and not checkcaller() then
             local Target = FindTarget()
             
             if Target and Target.Part then
                 local RayOrigin = CurrentCamera.CFrame.Position
                 local RayDirection = (Target.Part.Position - RayOrigin).Unit * settings.MaxDistance
-                Args[1] = Ray_new(RayOrigin, RayDirection)
+                Args[1] = Ray.new(RayOrigin, RayDirection)
+                Args[2] = {LocalPlayer.Character} -- Игнорируем себя
                 return OldNC(self, unpack(Args))
             end
         end
@@ -95,13 +94,11 @@ local function Hook()
 end
 
 -- API модуля
-function module.Enable()
-    settings.Enabled = true
-    Hook()
-end
-
-function module.Disable()
-    settings.Enabled = false
+function module.Toggle(state)
+    settings.Enabled = state
+    if state then
+        Hook()
+    end
 end
 
 function module.SetTeamCheck(value)
