@@ -18,8 +18,6 @@ local Settings = {
     EdgeJump = false
 }
 
-local Jitter = false
-
 local function BunnyHop()
     if not Settings.Enabled or not RootPart or not Humanoid then return end
     
