@@ -5,7 +5,7 @@ local LocalPlayer = Players.LocalPlayer
 
 local SkeletonESP = {
     Enabled = false,
-    TeamColor = true, -- Используем цвет команды
+    TeamColor = true,
     EnemyColor = Color3.fromRGB(255, 50, 50),
     AllyColor = Color3.fromRGB(50, 50, 255),
     Thickness = 1,
@@ -21,8 +21,8 @@ local R6_BONES = {
 }
 
 local WEAPON_ATTACHMENTS = {
-    "RightHand", -- Для большинства оружия
-    "LeftHand"   -- Для ножей/гранат
+    "RightHand",
+    "LeftHand"
 }
 
 local drawings = {}
@@ -32,18 +32,21 @@ local function CreateDrawing(type, props)
     for prop, value in pairs(props) do
         drawing[prop] = value
     end
-    table.insert(drawings, drawing)
     return drawing
 end
 
 local function UpdateESP()
+    -- Очищаем видимость всех рисунков перед обновлением
+    for _, drawing in pairs(drawings) do
+        drawing.Visible = false
+    end
+    
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             local character = player.Character
             local humanoid = character:FindFirstChildOfClass("Humanoid")
-            if not humanoid or humanoid.RigType ~= Enum.HumanoidRigType.R6 then continue end
+            if not humanoid or humanoid.RigType ~= Enum.HumanoidRigType.R6 then goto continue end
             
-            -- Определяем цвет
             local color = SkeletonESP.TeamColor and 
                          (player.Team == LocalPlayer.Team and SkeletonESP.AllyColor or SkeletonESP.EnemyColor) or
                          SkeletonESP.EnemyColor
@@ -70,8 +73,8 @@ local function UpdateESP()
                         drawings[key].From = Vector2.new(pos1.X, pos1.Y)
                         drawings[key].To = Vector2.new(pos2.X, pos2.Y)
                         drawings[key].Visible = SkeletonESP.Enabled
-                    else
-                        drawings[key].Visible = false
+                        drawings[key].Color = color
+                        drawings[key].Thickness = SkeletonESP.Thickness
                     end
                 end
             end
@@ -99,14 +102,16 @@ local function UpdateESP()
                                     drawings[key].From = Vector2.new(handPos.X, handPos.Y)
                                     drawings[key].To = Vector2.new(weaponPos.X, weaponPos.Y)
                                     drawings[key].Visible = SkeletonESP.Enabled
-                                else
-                                    drawings[key].Visible = false
+                                    drawings[key].Color = color
+                                    drawings[key].Thickness = SkeletonESP.Thickness
                                 end
                             end
                         end
                     end
                 end
             end
+            
+            ::continue::
         end
     end
 end
@@ -118,21 +123,30 @@ local function ClearDrawings()
     drawings = {}
 end
 
+-- Подключаем к RenderStepped
+local connection
+local function ToggleESP(state)
+    SkeletonESP.Enabled = state
+    
+    if state then
+        if connection then connection:Disconnect() end
+        connection = RunService.RenderStepped:Connect(UpdateESP)
+    else
+        if connection then
+            connection:Disconnect()
+            connection = nil
+        end
+        ClearDrawings()
+    end
+end
+
 return {
-    Toggle = function(state)
-        SkeletonESP.Enabled = state
-        if not state then ClearDrawings() end
-    end,
+    Toggle = ToggleESP,
     SetTeamColor = function(state)
         SkeletonESP.TeamColor = state
     end,
     SetThickness = function(value)
         SkeletonESP.Thickness = value
-        for _, drawing in pairs(drawings) do
-            if drawing.ClassName == "Line" then
-                drawing.Thickness = value
-            end
-        end
     end,
     SetShowWeapon = function(state)
         SkeletonESP.ShowWeapon = state
