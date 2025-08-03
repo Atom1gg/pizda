@@ -14,11 +14,15 @@ BodyVelocity.P = 1000
 local Settings = {
     Enabled = false,
     Speed = 30,
-    Direction = "directional", -- "directional", "directional 2", "forward"
-    EdgeJump = false
+    Direction = "directional", -- "directional", "forward"
+    EdgeJump = false,
+    StrafeBoost = true,
+    StrafeMultiplier = 1.5,
+    StrafeSensitivity = 2.0
 }
 
-local Jitter = false
+local lastCameraAngle = 0
+local cameraRotationSpeed = 0
 local Connection
 
 -- Функция для обновления ссылок на персонажа
@@ -30,6 +34,14 @@ local function UpdateCharacter()
         return true
     end
     return false
+end
+
+-- Функция для расчета скорости поворота камеры
+local function CalculateCameraRotation()
+    local currentCameraAngle = workspace.CurrentCamera.CFrame:ToEulerAnglesXYZ()
+    local deltaAngle = math.deg(currentCameraAngle - lastCameraAngle)
+    lastCameraAngle = currentCameraAngle
+    cameraRotationSpeed = deltaAngle * Settings.StrafeSensitivity
 end
 
 -- Основная логика Bunny Hop
@@ -44,6 +56,9 @@ local function BunnyHop()
     -- Проверяем состояние персонажа
     if Humanoid:GetState() == Enum.HumanoidStateType.Dead then return end
 
+    -- Рассчитываем скорость поворота камеры
+    CalculateCameraRotation()
+
     BodyVelocity:Destroy()
     BodyVelocity = Instance.new("BodyVelocity")
     BodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
@@ -51,7 +66,7 @@ local function BunnyHop()
     -- Bunny Hop Logic
     if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
         local add = 0
-        if Settings.Direction == "directional" or Settings.Direction == "directional 2" then
+        if Settings.Direction == "directional" then
             if UserInputService:IsKeyDown(Enum.KeyCode.A) then add = 90 end
             if UserInputService:IsKeyDown(Enum.KeyCode.S) then add = 180 end
             if UserInputService:IsKeyDown(Enum.KeyCode.D) then add = 270 end
@@ -64,7 +79,14 @@ local function BunnyHop()
         local rot = CFrame.new(RootPart.Position, RootPart.Position + RootPart.CFrame.LookVector) * CFrame.Angles(0, math.rad(add), 0)
         BodyVelocity.Parent = RootPart
         Humanoid.Jump = true
-        BodyVelocity.Velocity = Vector3.new(rot.LookVector.X, 0, rot.LookVector.Z) * Settings.Speed
+        
+        local speed = Settings.Speed
+        -- Применяем ускорение от стрейфа
+        if Settings.StrafeBoost and math.abs(cameraRotationSpeed) > 5 then
+            speed = speed * Settings.StrafeMultiplier
+        end
+        
+        BodyVelocity.Velocity = Vector3.new(rot.LookVector.X, 0, rot.LookVector.Z) * speed
         
         if add == 0 and Settings.Direction == "directional" and not UserInputService:IsKeyDown(Enum.KeyCode.W) then
             BodyVelocity:Destroy()
@@ -116,9 +138,13 @@ local function Toggle(state)
     end
 end
 
+-- Обновленные настройки для UI
 return {
     Toggle = Toggle,
     SetSpeed = function(value) Settings.Speed = value end,
     SetDirection = function(value) Settings.Direction = value end,
-    SetEdgeJump = function(state) Settings.EdgeJump = state end
+    SetEdgeJump = function(state) Settings.EdgeJump = state end,
+    SetStrafeBoost = function(state) Settings.StrafeBoost = state end,
+    SetStrafeMultiplier = function(value) Settings.StrafeMultiplier = value end,
+    SetStrafeSensitivity = function(value) Settings.StrafeSensitivity = value end
 }
