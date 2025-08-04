@@ -37,7 +37,7 @@ end
 -- Функция для сохранения настроек
 local function saveSettings()
     local success, err = pcall(function()
-        writefile("ui_settings.json", HttpService:JSONEncode(API.savedSettings))
+        writefile("UmbrellaHub.json", HttpService:JSONEncode(API.savedSettings))
     end)
     if not success then
         warn("Failed to save settings:", err)
@@ -47,7 +47,7 @@ end
 -- Функция для загрузки настроек
 local function loadSettings()
     local success, result = pcall(function()
-        if isfile("ui_settings.json") then
+        if isfile("UmbrellaHub.json") then
             return HttpService:JSONDecode(readfile("UmbrellaHub.json"))
         end
         return {}
