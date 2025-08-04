@@ -48,7 +48,7 @@ end
 local function loadSettings()
     local success, result = pcall(function()
         if isfile("ui_settings.json") then
-            return HttpService:JSONDecode(readfile("ui_settings.json"))
+            return HttpService:JSONDecode(readfile("UmbrellaHub.json"))
         end
         return {}
     end)
