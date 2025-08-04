@@ -10,9 +10,9 @@ local function Main()
 		Spinbot = 'https://raw.githubusercontent.com/Atom1gg/pizda/main/modules/Spinbot.lua',
 		SilentAim = 'https://raw.githubusercontent.com/Atom1gg/pizda/main/modules/SilentAim.lua',
 		Chams = 'https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/modules/Chams.lua',
-		KillSay = 'https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/modules/KillSay',
-		GrenadeTrajectory = 'https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/modules/GrenadeTrajectory',
-		ESP = 'https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/modules/ESP',
+		KillSay = 'https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/modules/KillSay.lua',
+		GrenadeTrajectory = 'https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/modules/GrenadeTrajectory.lua',
+		ESP = 'https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/modules/ESP.lua',
 	}
 
 	-- Загрузка UI библиотеки
@@ -31,15 +31,7 @@ local function Main()
 		GrenadeTrajectory = { instance = nil, enabled = false },
 		KillSay = { instance = nil, enabled = false },
 		ESP = { instance = nil, enabled = false },
-		SilentAim = {
-			instance = nil,
-			enabled = false,
-			settings = {
-				TeamCheck = true,
-				OnlyHead = true,
-				MaxDistance = 1000,
-			},
-		},
+		SilentAim = {instance = nil, enabled = false, settings = {TeamCheck = true, OnlyHead = true, MaxDistance = 1000, }, },
 		Chams = { instance = nil, enabled = false },
 	}
 
@@ -354,6 +346,99 @@ local function Main()
 					},
 				},
 			},
+			['Bomb ESP'] = {
+            settings = {
+                {
+                    type = 'toggle',
+                    name = 'Enabled',
+                    default = false,
+                    callback = function(s)
+                        ToggleModule('BombESP', s)
+                    end,
+                },
+                {
+                    type = 'color',
+                    name = 'Chams Color',
+                    default = Color3.fromRGB(255, 0, 0),
+                    callback = function(color)
+                        if modules.BombESP.instance then
+                            modules.BombESP.instance.SetColor(color)
+                        end
+                    end,
+                },
+                {
+                    type = 'toggle',
+                    name = 'Show Text',
+                    default = true,
+                    callback = function(s)
+                        if modules.BombESP.instance then
+                            modules.BombESP.instance.SetTextVisibility(s)
+                        end
+                    end,
+                },
+                {
+                    type = 'slider',
+                    name = 'Transparency',
+                    min = 0,
+                    max = 1,
+                    default = 0.5,
+                    increment = 0.1,
+                    callback = function(v)
+                        if modules.BombESP.instance then
+                            modules.BombESP.instance.SetTransparency(v)
+                        end
+                    end,
+                },
+            },
+        },
+	['FOV Changer'] = {
+            settings = {
+                {
+                    type = 'toggle',
+                    name = 'Enabled',
+                    default = false,
+                    callback = function(s)
+                        ToggleModule('ChangeFOV', s)
+                    end,
+                },
+                {
+                    type = 'slider',
+                    name = 'FOV',
+                    min = 70,
+                    max = 120,
+                    default = 90,
+                    callback = function(v)
+                        if modules.ChangeFOV.instance then
+                            modules.ChangeFOV.instance.SetFOV(v)
+                        end
+                    end,
+                },
+            },
+        },
+		['Third Person'] = {
+            settings = {
+                {
+                    type = 'toggle',
+                    name = 'Enabled',
+                    default = false,
+                    callback = function(s)
+                        ToggleModule('ThirdPerson', s)
+                    end,
+                },
+                {
+                    type = 'slider',
+                    name = 'Distance',
+                    min = 3,
+                    max = 20,
+                    default = 5,
+                    callback = function(v)
+                        if modules.ThirdPerson.instance then
+                            modules.ThirdPerson.instance.SetDistance(v)
+                        end
+                    end,
+                },
+            },
+        },
 			['Auto Bhop'] = {
 				settings = {
 					{
@@ -379,27 +464,50 @@ local function Main()
 						end,
 					},
 					{
-						type = 'dropdown',
-						name = 'Direction',
-						options = {
-							'directional',
-							'directional 2',
-							'forward',
-						},
-						default = 'directional',
-						callback = function(v)
-							if modules.AutoBhop.instance then
-								modules.AutoBhop.instance.SetDirection(v)
-							end
-						end,
-					},
-					{
 						type = 'toggle',
 						name = 'Edge Jump',
 						default = false,
 						callback = function(s)
 							if modules.AutoBhop.instance then
 								modules.AutoBhop.instance.SetEdgeJump(s)
+							end
+						end,
+					},
+					{
+						type = 'toggle',
+						name = 'Strafe Boost',
+						default = true,
+						callback = function(s)
+							if modules.AutoBhop.instance then
+								modules.AutoBhop.instance.SetStrafeBoost(s)
+							end
+						end,
+					},
+					{
+						type = 'slider',
+						name = 'Strafe Multiplier',
+						min = 1,
+						max = 5,
+						default = 1,
+						increment = 0.1,
+						callback = function(v)
+							if modules.AutoBhop.instance then
+								modules.AutoBhop.instance.SetStrafeMultiplier(v)
+							end
+						end,
+					},
+					{
+						type = 'slider',
+						name = 'Strafe Sensitivity',
+						min = 0.1,
+						max = 5,
+						default = 2.0,
+						increment = 0.1,
+						callback = function(v)
+							if modules.AutoBhop.instance then
+								modules.AutoBhop.instance.SetStrafeSensitivity(
+									v
+								)
 							end
 						end,
 					},
@@ -472,7 +580,6 @@ local function Main()
 	uiLib.init({
 		moduleSystem = {
 			modules = UI_API.modules,
-			activeCategory = 'Combat',
 		},
 		moduleSettings = UI_API.settings,
 	})
