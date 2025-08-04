@@ -62,31 +62,34 @@ local function Main()
 		end
 	end
 
-local function ToggleModule(moduleName, state)
-    -- Проверяем загрузку
-    if not modules[moduleName].instance and not LoadModule(moduleName) then
-        return false
-    end
+	local function ToggleModule(moduleName, state)
+		if not modules[moduleName].instance and not LoadModule(moduleName) then
+			return false
+		end
 
-    -- Особый случай для SilentAim
-    if moduleName == 'SilentAim' then
-        modules.SilentAim.instance.Toggle(state)
-        if state then
-            local settings = modules.SilentAim.settings or {}
-            modules.SilentAim.instance.SetTeamCheck(settings.TeamCheck or true)
-            modules.SilentAim.instance.SetOnlyHead(settings.OnlyHead or false)
-            modules.SilentAim.instance.SetMaxDistance(settings.MaxDistance or 1000)
-        end
-    else
-        -- Обычные модули
-        pcall(function()
-            modules[moduleName].instance.Toggle(state)
-        end)
-    end
+		if moduleName == 'SilentAim' then
+			modules.SilentAim.instance.Toggle(state) -- Просто включаем/выключаем
+			if state then
+				-- Применяем настройки только при включении
+				modules.SilentAim.instance.SetTeamCheck(
+					modules.SilentAim.settings.TeamCheck
+				)
+				modules.SilentAim.instance.SetOnlyHead(
+					modules.SilentAim.settings.OnlyHead
+				)
+				modules.SilentAim.instance.SetMaxDistance(
+					modules.SilentAim.settings.MaxDistance
+				)
+			end
+		else
+			pcall(function()
+				modules[moduleName].instance.Toggle(state)
+			end)
+		end
 
-    modules[moduleName].enabled = state
-    return true
-end
+		modules[moduleName].enabled = state
+		return true
+	end
 
 	-- Все модули и их настройки (с добавлением SilentAim)
 	local UI_API = {
