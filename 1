@@ -65,6 +65,15 @@ loadSettings()
 
 function API:registerModule(category, moduleData)
     self.modules[category] = self.modules[category] or {}
+    
+    -- Проверяем, есть ли сохранённое состояние модуля
+    if API.savedSettings[moduleData.name] and API.savedSettings[moduleData.name].Enabled == true then
+        moduleData.enabled = true
+        if moduleData.callback then
+            moduleData.callback(true) -- Автоматически включаем модуль
+        end
+    end
+    
     table.insert(self.modules[category], moduleData)
 end
 
@@ -674,17 +683,34 @@ function API:saveSettings()
 end
 
 function API:loadSettings()
-    loadSettings()
+    local success, result = pcall(function()
+        if isfile("UmbrellaHub.json") then
+            return HttpService:JSONDecode(readfile("UmbrellaHub.json"))
+        end
+        return {}
+    end)
     
-    -- Применяем загруженные настройки ко всем модулям
-    for moduleName, settings in pairs(self.settings) do
-        if self.savedSettings[moduleName] then
-            for _, setting in ipairs(settings.settings) do
-                if self.savedSettings[moduleName][setting.name] ~= nil then
-                    setting.default = self.savedSettings[moduleName][setting.name]
+    if success then
+        API.savedSettings = result or {}
+        
+        -- Применяем загруженные настройки и включаем модули
+        for moduleName, settings in pairs(self.settings) do
+            if API.savedSettings[moduleName] then
+                for _, setting in ipairs(settings.settings) do
+                    if API.savedSettings[moduleName][setting.name] ~= nil then
+                        setting.default = API.savedSettings[moduleName][setting.name]
+                        
+                        -- Если это toggle и он включён, вызываем callback
+                        if setting.type == "toggle" and setting.default == true and setting.callback then
+                            setting.callback(true)
+                        end
+                    end
                 end
             end
         end
+    else
+        warn("Failed to load settings:", result)
+        API.savedSettings = {}
     end
 end
 
