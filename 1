@@ -707,7 +707,7 @@ local function showModuleSettings(moduleName)
         settingsContainer,
         UDim2.new(1, -10, 1, -10),
         UDim2.new(0, 5, 0, 5),
-        UDim.new(0, 15)
+        UDim.new(0, 5)
     )
     
     local yOffset = 0
@@ -719,13 +719,13 @@ local function showModuleSettings(moduleName)
             yOffset = yOffset + 15
         elseif setting.type == "toggle" then
             local toggle = createToggle(container, setting, UDim2.new(0, 0, 0, yOffset))
-            yOffset = yOffset + 15
+            yOffset = yOffset + 5
         elseif setting.type == "textfield" then
             local textField = createTextField(container, setting, UDim2.new(0, 0, 0, yOffset))
-            yOffset = yOffset + 15
+            yOffset = yOffset + 5
         elseif setting.type == "dropdown" then
             local dropDown = createDropDown(container, setting, UDim2.new(0, 0, 0, yOffset))
-            yOffset = yOffset + 20
+            yOffset = yOffset + 5
         end
     end
 end
