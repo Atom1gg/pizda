@@ -208,9 +208,9 @@ local function createDropDown(parent, setting, position)
     frame.Size = UDim2.new(0, 280, 0, 50)
     frame.Position = position
     frame.BackgroundTransparency = 1
-    frame.ClipsDescendants = true
     frame.Parent = parent
 
+    -- Название настройки
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(0.6, 0, 1, 0)
     label.Position = UDim2.new(0, 10, 0, 0)
@@ -222,6 +222,7 @@ local function createDropDown(parent, setting, position)
     label.BackgroundTransparency = 1
     label.Parent = frame
 
+    -- Кнопка выбора
     local dropDownButton = Instance.new("TextButton")
     dropDownButton.Size = UDim2.new(0, 120, 0, 30)
     dropDownButton.Position = UDim2.new(0.6, 10, 0.5, -15)
@@ -239,7 +240,7 @@ local function createDropDown(parent, setting, position)
     selectedText.Size = UDim2.new(1, -10, 1, 0)
     selectedText.Position = UDim2.new(0, 5, 0, 0)
     selectedText.BackgroundTransparency = 1
-    selectedText.Text = setting.default and (setting.multiSelect and table.concat(setting.default, ", ") or setting.default) or "Select..."
+    selectedText.Text = setting.default or "Select..."
     selectedText.TextColor3 = Color3.fromRGB(200, 200, 200)
     selectedText.Font = Enum.Font.SourceSans
     selectedText.TextSize = 18
@@ -247,175 +248,101 @@ local function createDropDown(parent, setting, position)
     selectedText.TextTruncate = Enum.TextTruncate.AtEnd
     selectedText.Parent = dropDownButton
 
-    -- Создаем меню в корне GUI, а не внутри фрейма
+    -- Меню (в центре кнопки)
     local dropDownMenu = Instance.new("Frame")
-    dropDownMenu.Size = UDim2.new(0, 120, 0, 0)
+    dropDownMenu.Size = UDim2.new(0, 0, 0, 0)
+    dropDownMenu.AnchorPoint = Vector2.new(0.5, 0.5)
+    dropDownMenu.Position = UDim2.new(0.5, 0, 0.5, 0)
     dropDownMenu.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
     dropDownMenu.BorderSizePixel = 0
     dropDownMenu.ClipsDescendants = true
     dropDownMenu.Visible = false
     dropDownMenu.ZIndex = 100
-    dropDownMenu.Parent = _G.mainFrame
+    dropDownMenu.Parent = dropDownButton
 
     local menuCorner = Instance.new("UICorner")
-    menuCorner.CornerRadius = UDim.new(0, 4)
+    menuCorner.CornerRadius = UDim.new(0, 6)
     menuCorner.Parent = dropDownMenu
-
-    local menuContainer = Instance.new("ScrollingFrame")
-    menuContainer.Size = UDim2.new(1, 0, 1, 0)
-    menuContainer.Position = UDim2.new(0, 0, 0, 0)
-    menuContainer.BackgroundTransparency = 1
-    menuContainer.ScrollBarThickness = 0
-    menuContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-    menuContainer.Parent = dropDownMenu
 
     local menuLayout = Instance.new("UIListLayout")
     menuLayout.Padding = UDim.new(0, 5)
-    menuLayout.Parent = menuContainer
+    menuLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    menuLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    menuLayout.Parent = dropDownMenu
 
     local isOpen = false
-    local selectedValues = setting.default and (setting.multiSelect and table.clone(setting.default) or {setting.default}) or {}
+    local selectedValue = setting.default
 
-    -- Функция для обновления позиции меню
-    local function updateMenuPosition()
-        local buttonPos = dropDownButton.AbsolutePosition
-        local buttonSize = dropDownButton.AbsoluteSize
-        dropDownMenu.Position = UDim2.new(0, buttonPos.X, 0, buttonPos.Y + buttonSize.Y + 5)
-    end
-
-    -- Функция для закрытия меню
-    function frame.Close()
-        if isOpen then
-            isOpen = false
-            dropDownMenu:TweenSize(UDim2.new(0, 120, 0, 0), "Out", "Quad", 0.2, true, function()
-                dropDownMenu.Visible = false
-            end)
-        end
-    end
-
+    -- Создаём опции
     local function updateMenu()
-        for _, child in ipairs(menuContainer:GetChildren()) do
-            if child:IsA("Frame") then
+        for _, child in ipairs(dropDownMenu:GetChildren()) do
+            if child:IsA("TextButton") then
                 child:Destroy()
             end
         end
 
         for _, option in ipairs(setting.options) do
-            local optionFrame = Instance.new("Frame")
-            optionFrame.Size = UDim2.new(1, 0, 0, 30)
-            optionFrame.BackgroundTransparency = 1
-            optionFrame.Parent = menuContainer
-
             local optionButton = Instance.new("TextButton")
-            optionButton.Size = UDim2.new(1, 0, 1, 0)
+            optionButton.Size = UDim2.new(1, -10, 0, 30)
             optionButton.BackgroundColor3 = Color3.fromRGB(30, 30, 32)
             optionButton.BorderSizePixel = 0
-            optionButton.AutoButtonColor = false
-            optionButton.Text = ""
-            optionButton.Parent = optionFrame
+            optionButton.AutoButtonColor = true
+            optionButton.Text = option
+            optionButton.Font = Enum.Font.SourceSans
+            optionButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+            optionButton.TextSize = 18
+            optionButton.Parent = dropDownMenu
 
-            local optionCorner = Instance.new("UICorner")
-            optionCorner.CornerRadius = UDim.new(0, 4)
-            optionCorner.Parent = optionButton
-
-            local optionText = Instance.new("TextLabel")
-            optionText.Size = UDim2.new(1, -10, 1, 0)
-            optionText.Position = UDim2.new(0, 10, 0, 0)
-            optionText.BackgroundTransparency = 1
-            optionText.Text = option
-            optionText.TextColor3 = Color3.fromRGB(200, 200, 200)
-            optionText.Font = Enum.Font.SourceSans
-            optionText.TextSize = 18
-            optionText.TextXAlignment = Enum.TextXAlignment.Left
-            optionText.Parent = optionButton
-
-            local checkIcon = Instance.new("ImageLabel")
-            checkIcon.Size = UDim2.new(0, 20, 0, 20)
-            checkIcon.Position = UDim2.new(1, -25, 0.5, -10)
-            checkIcon.AnchorPoint = Vector2.new(0, 0.5)
-            checkIcon.BackgroundTransparency = 1
-            checkIcon.Image = "rbxassetid://3926305904"
-            checkIcon.ImageRectOffset = Vector2.new(964, 324)
-            checkIcon.ImageRectSize = Vector2.new(36, 36)
-            checkIcon.ImageColor3 = Color3.fromRGB(255, 75, 75)
-            checkIcon.Visible = false
-            checkIcon.Parent = optionButton
-
-            if setting.multiSelect then
-                checkIcon.Visible = table.find(selectedValues, option) ~= nil
-            else
-                checkIcon.Visible = selectedValues[1] == option
-            end
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 4)
+            corner.Parent = optionButton
 
             optionButton.MouseButton1Click:Connect(function()
-                if setting.multiSelect then
-                    local index = table.find(selectedValues, option)
-                    if index then
-                        table.remove(selectedValues, index)
-                        checkIcon.Visible = false
-                    else
-                        table.insert(selectedValues, option)
-                        checkIcon.Visible = true
-                    end
-                else
-                    selectedValues = {option}
-                    for _, child in ipairs(menuContainer:GetChildren()) do
-                        if child:IsA("Frame") then
-                            local icon = child:FindFirstChild("ImageLabel")
-                            if icon then
-                                icon.Visible = child.TextButton.TextLabel.Text == option
-                            end
-                        end
-                    end
-                end
+                selectedValue = option
+                selectedText.Text = option
 
-                selectedText.Text = setting.multiSelect and table.concat(selectedValues, ", ") or selectedValues[1]
-                
-                -- Сохраняем настройки
+                -- Сохраняем выбор
                 if not API.savedSettings[setting.moduleName] then
                     API.savedSettings[setting.moduleName] = {}
                 end
-                API.savedSettings[setting.moduleName][setting.name] = setting.multiSelect and selectedValues or selectedValues[1]
+                API.savedSettings[setting.moduleName][setting.name] = option
                 saveSettings()
-                
+
                 if setting.callback then
-                    setting.callback(setting.multiSelect and selectedValues or selectedValues[1])
+                    setting.callback(option)
                 end
+
+                frame:Close()
             end)
         end
+    end
 
-        menuContainer.CanvasSize = UDim2.new(0, 0, 0, #setting.options * 35)
+    -- Открыть/закрыть
+    function frame:Close()
+        if isOpen then
+            isOpen = false
+            TweenService:Create(dropDownMenu, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size = UDim2.new(0, 0, 0, 0)
+            }):Play()
+            task.delay(0.25, function() dropDownMenu.Visible = false end)
+        end
     end
 
     local function toggleMenu()
         isOpen = not isOpen
         if isOpen then
             closeAllDropdowns(frame)
-            updateMenuPosition()
             updateMenu()
             dropDownMenu.Visible = true
-            dropDownMenu:TweenSize(UDim2.new(0, 120, 0, math.min(#setting.options * 35, 200)), "Out", "Quad", 0.2, true)
+            TweenService:Create(dropDownMenu, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size = UDim2.new(0, 150, 0, math.min(#setting.options * 35, 150))
+            }):Play()
         else
             frame:Close()
         end
     end
 
     dropDownButton.MouseButton1Click:Connect(toggleMenu)
-
-    -- Закрытие при клике вне меню
-    local connection
-    dropDownButton.MouseButton1Click:Connect(function()
-        if connection then connection:Disconnect() end
-        connection = UIS.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                local mousePos = input.Position
-                if not dropDownMenu.AbsoluteRect:PointInside(mousePos) and not dropDownButton.AbsoluteRect:PointInside(mousePos) then
-                    frame:Close()
-                    connection:Disconnect()
-                end
-            end
-        end)
-    end)
 
     return frame
 end
