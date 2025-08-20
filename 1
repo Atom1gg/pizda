@@ -19,7 +19,8 @@ local API = {
     modules = {},
     settings = {},
     callbacks = {},
-    savedSettings = {}
+    savedSettings = {},
+    savedModuleStates = {} -- НОВОЕ: отдельное сохранение состояний модулей
 }
 
 local function closeAllDropdowns(except)
@@ -34,17 +35,21 @@ local function closeAllDropdowns(except)
     end
 end
 
--- Функция для сохранения настроек
+-- ИСПРАВЛЕНО: Улучшенная система сохранения
 local function saveSettings()
     local success, err = pcall(function()
-        writefile("UmbrellaHub.json", HttpService:JSONEncode(API.savedSettings))
+        local dataToSave = {
+            settings = API.savedSettings,
+            moduleStates = API.savedModuleStates
+        }
+        writefile("UmbrellaHub.json", HttpService:JSONEncode(dataToSave))
     end)
     if not success then
         warn("Failed to save settings:", err)
     end
 end
 
--- Функция для загрузки настроек
+-- ИСПРАВЛЕНО: Улучшенная система загрузки
 local function loadSettings()
     local success, result = pcall(function()
         if isfile("UmbrellaHub.json") then
@@ -52,11 +57,15 @@ local function loadSettings()
         end
         return {}
     end)
-    if success then
-        API.savedSettings = result or {}
+    if success and result then
+        -- Загружаем настройки модулей
+        API.savedSettings = result.settings or {}
+        -- Загружаем состояния модулей (включен/выключен)
+        API.savedModuleStates = result.moduleStates or {}
     else
         warn("Failed to load settings:", result)
         API.savedSettings = {}
+        API.savedModuleStates = {}
     end
 end
 
@@ -66,16 +75,29 @@ loadSettings()
 function API:registerModule(category, moduleData)
     self.modules[category] = self.modules[category] or {}
     table.insert(self.modules[category], moduleData)
+    
+    -- НОВОЕ: Загружаем сохраненное состояние модуля
+    if self.savedModuleStates[moduleData.name] ~= nil then
+        moduleData.enabled = self.savedModuleStates[moduleData.name]
+        -- Если модуль был включен, вызываем onEnable
+        if moduleData.enabled and self.callbacks[moduleData.name] and self.callbacks[moduleData.name].onEnable then
+            pcall(self.callbacks[moduleData.name].onEnable)
+        end
+    end
 end
 
 function API:registerSettings(moduleName, settingsTable)
     self.settings[moduleName] = {settings = settingsTable}
     
-    -- Загружаем сохраненные значения
+    -- ИСПРАВЛЕНО: Правильная загрузка сохраненных значений
     if API.savedSettings[moduleName] then
         for _, setting in ipairs(settingsTable) do
             if API.savedSettings[moduleName][setting.name] ~= nil then
                 setting.default = API.savedSettings[moduleName][setting.name]
+                -- НОВОЕ: Сразу применяем загруженное значение через callback
+                if setting.callback then
+                    pcall(setting.callback, setting.default)
+                end
             end
         end
     end
@@ -119,11 +141,10 @@ local function createScrollableContainer(parent, size, position, padding)
     scrollFrame.Size = size
     scrollFrame.Position = position
     scrollFrame.BackgroundTransparency = 1
-    scrollFrame.ScrollBarThickness = 0 -- Скрываем скроллбар
+    scrollFrame.ScrollBarThickness = 0
     scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
     scrollFrame.Parent = parent
     
-    -- Добавляем невидимый скроллбар с анимацией
     local scrollBar = Instance.new("Frame")
     scrollBar.Size = UDim2.new(0, 4, 1, 0)
     scrollBar.Position = UDim2.new(1, -4, 0, 0)
@@ -158,18 +179,15 @@ local function createScrollableContainer(parent, size, position, padding)
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
         
-        -- Обновляем скроллбар
         local visibleRatio = scrollFrame.AbsoluteWindowSize.Y / scrollFrame.CanvasSize.Y
         scrollBarFill.Size = UDim2.new(1, 0, visibleRatio, 0)
     end)
     
-    -- Анимация скроллбара при прокрутке
     scrollFrame:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
         local positionRatio = scrollFrame.CanvasPosition.Y / (scrollFrame.CanvasSize.Y - scrollFrame.AbsoluteWindowSize.Y)
         scrollBarFill.Position = UDim2.new(0, 0, positionRatio * (1 - scrollBarFill.Size.Y.Scale), 0)
     end)
     
-    -- Показываем скроллбар при наведении
     scrollFrame.MouseEnter:Connect(function()
         tweenTransparency(scrollBar, "Transparency", 0.5)
     end)
@@ -210,7 +228,6 @@ local function createDropDown(parent, setting, position)
     frame.BackgroundTransparency = 1
     frame.Parent = parent
 
-    -- Название настройки
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(0.6, 0, 1, 0)
     label.Position = UDim2.new(0, 10, 0, 0)
@@ -222,7 +239,6 @@ local function createDropDown(parent, setting, position)
     label.BackgroundTransparency = 1
     label.Parent = frame
 
-    -- Кнопка выбора
     local dropDownButton = Instance.new("TextButton")
     dropDownButton.Size = UDim2.new(0, 120, 0, 30)
     dropDownButton.Position = UDim2.new(0.6, 10, 0.5, -15)
@@ -248,7 +264,6 @@ local function createDropDown(parent, setting, position)
     selectedText.TextTruncate = Enum.TextTruncate.AtEnd
     selectedText.Parent = dropDownButton
 
-    -- Меню (в центре кнопки)
     local dropDownMenu = Instance.new("Frame")
     dropDownMenu.Size = UDim2.new(0, 0, 0, 0)
     dropDownMenu.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -273,7 +288,6 @@ local function createDropDown(parent, setting, position)
     local isOpen = false
     local selectedValue = setting.default
 
-    -- Создаём опции
     local function updateMenu()
         for _, child in ipairs(dropDownMenu:GetChildren()) do
             if child:IsA("TextButton") then
@@ -301,7 +315,6 @@ local function createDropDown(parent, setting, position)
                 selectedValue = option
                 selectedText.Text = option
 
-                -- Сохраняем выбор
                 if not API.savedSettings[setting.moduleName] then
                     API.savedSettings[setting.moduleName] = {}
                 end
@@ -317,7 +330,6 @@ local function createDropDown(parent, setting, position)
         end
     end
 
-    -- Открыть/закрыть
     function frame:Close()
         if isOpen then
             isOpen = false
@@ -347,7 +359,6 @@ local function createDropDown(parent, setting, position)
     return frame
 end
 
-
 local function createTextField(parent, setting, position)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0, 280, 0, 50)
@@ -368,7 +379,8 @@ local function createTextField(parent, setting, position)
 
     local textBoxBackground = Instance.new("Frame")
     textBoxBackground.Size = UDim2.new(0, 120, 0, 30)
-    textBoxBackground.Position = UDim2.new(0.7, 280, 0.5, -15)
+    -- ИСПРАВЛЕНО: Правильное позиционирование
+    textBoxBackground.Position = UDim2.new(0.6, 10, 0.5, -15)
     textBoxBackground.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
     textBoxBackground.BorderSizePixel = 0
     textBoxBackground.Parent = frame
@@ -391,7 +403,6 @@ local function createTextField(parent, setting, position)
     textBox.Parent = textBoxBackground
 
     local function updateValue()
-        -- Сохраняем настройки
         if not API.savedSettings[setting.moduleName] then
             API.savedSettings[setting.moduleName] = {}
         end
@@ -472,6 +483,7 @@ local function createSlider(parent, setting, position)
     circleCorner.Parent = sliderCircle
 
     local dragging = false
+    local debounceTime = 0
 
     local function updateSlider(value)
         local relativePos = (value - setting.min) / (setting.max - setting.min)
@@ -479,12 +491,18 @@ local function createSlider(parent, setting, position)
         sliderActive.Size = UDim2.new(relativePos, 0, 1, 0)
         valueDisplay.Text = tostring(value) .. (setting.isPercentage and "%" or "")
         
-        -- Сохраняем настройки
-        if not API.savedSettings[setting.moduleName] then
-            API.savedSettings[setting.moduleName] = {}
-        end
-        API.savedSettings[setting.moduleName][setting.name] = value
-        saveSettings()
+        -- ИСПРАВЛЕНО: Debounce для сохранения (не сохраняем при каждом движении)
+        local currentTime = tick()
+        debounceTime = currentTime
+        task.delay(0.5, function()
+            if debounceTime == currentTime then
+                if not API.savedSettings[setting.moduleName] then
+                    API.savedSettings[setting.moduleName] = {}
+                end
+                API.savedSettings[setting.moduleName][setting.name] = value
+                saveSettings()
+            end
+        end)
         
         if setting.callback then
             setting.callback(value)
@@ -543,7 +561,8 @@ local function createToggle(parent, setting, position)
 
     local switchTrack = Instance.new("Frame")
     switchTrack.Size = UDim2.new(0, 40, 0, 20)
-    switchTrack.Position = UDim2.new(0.8, 330, 0.5, -5)
+    -- ИСПРАВЛЕНО: Правильное позиционирование
+    switchTrack.Position = UDim2.new(0.6, 30, 0.5, -10)
     switchTrack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     switchTrack.BorderSizePixel = 0
     switchTrack.Parent = outerFrame
@@ -564,6 +583,7 @@ local function createToggle(parent, setting, position)
     circleCorner.Parent = switchCircle
 
     local isEnabled = setting.default
+    -- ИСПРАВЛЕНО: Применяем загруженное состояние к UI
     if isEnabled then
         switchCircle.Position = UDim2.new(1, -19, 0, 1)
         switchCircle.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
@@ -580,7 +600,6 @@ local function createToggle(parent, setting, position)
                 switchCircle.BackgroundColor3 = Color3.fromRGB(142, 142, 142)
             end
             
-            -- Сохраняем настройки
             if not API.savedSettings[setting.moduleName] then
                 API.savedSettings[setting.moduleName] = {}
             end
@@ -603,21 +622,29 @@ end
 function API:loadSettings()
     loadSettings()
     
-    -- Применяем загруженные настройки ко всем модулям
     for moduleName, settings in pairs(self.settings) do
         if self.savedSettings[moduleName] then
             for _, setting in ipairs(settings.settings) do
                 if self.savedSettings[moduleName][setting.name] ~= nil then
                     setting.default = self.savedSettings[moduleName][setting.name]
+                    if setting.callback then
+                        pcall(setting.callback, setting.default)
+                    end
                 end
             end
         end
     end
 end
 
+-- НОВАЯ ФУНКЦИЯ: Сохранение состояния модуля
+local function saveModuleState(moduleName, enabled)
+    API.savedModuleStates[moduleName] = enabled
+    saveSettings()
+end
+
 local function showModuleSettings(moduleName)
     clearSettingsContainer()
-    API:loadSettings() -- Загружаем настройки перед отображением
+    API:loadSettings()
     
     local settingsContainer = _G.mainFrame:FindFirstChild("SettingsContainer")
     if not settingsContainer then return end
@@ -707,6 +734,14 @@ local function createModuleButton(parent, moduleData)
 
     local debounce = false
 
+    -- ИСПРАВЛЕНО: Применяем сохраненное состояние модуля к UI при создании
+    if moduleData.enabled then
+        moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
+        moduleName.TextColor3 = Color3.fromRGB(255, 75, 75)
+        activeLine.Size = UDim2.new(0, 2, 1, -20)
+        activeLine.Transparency = 0
+    end
+
     clickDetector.MouseEnter:Connect(function()
         if not moduleData.enabled then
             tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(20, 20, 22), 0.15)
@@ -725,6 +760,7 @@ local function createModuleButton(parent, moduleData)
         if debounce then return end
         debounce = true
 
+        -- Отключаем все остальные модули в категории
         for _, otherButton in pairs(parent:GetChildren()) do
             if otherButton:IsA("Frame") and otherButton ~= moduleButton then
                 local otherLine = otherButton:FindFirstChild("Frame")
@@ -742,15 +778,28 @@ local function createModuleButton(parent, moduleData)
 
                 if otherIndex then
                     if API.modules[moduleSystem.activeCategory] then
-                        API.modules[moduleSystem.activeCategory][otherIndex].enabled = false
+                        local otherModule = API.modules[moduleSystem.activeCategory][otherIndex]
+                        if otherModule and otherModule.enabled then
+                            otherModule.enabled = false
+                            saveModuleState(otherModule.name, false)
+                            -- Вызываем onDisable для отключенного модуля
+                            if API.callbacks[otherModule.name] and API.callbacks[otherModule.name].onDisable then
+                                pcall(API.callbacks[otherModule.name].onDisable)
+                            end
+                        end
                     else
-                        moduleSystem.modules[moduleSystem.activeCategory][otherIndex].enabled = false
+                        local otherModule = moduleSystem.modules[moduleSystem.activeCategory][otherIndex]
+                        if otherModule and otherModule.enabled then
+                            otherModule.enabled = false
+                            saveModuleState(otherModule.name, false)
+                        end
                     end
                 end
             end
         end
 
         moduleData.enabled = not moduleData.enabled
+        saveModuleState(moduleData.name, moduleData.enabled) -- НОВОЕ: Сохраняем состояние
 
         if moduleData.enabled then
             tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
@@ -796,13 +845,6 @@ local function createModuleButton(parent, moduleData)
         debounce = false
     end)
 
-    if moduleData.enabled then
-        moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
-        moduleName.TextColor3 = Color3.fromRGB(255, 75, 75)
-        activeLine.Size = UDim2.new(0, 2, 1, -20)
-        activeLine.Transparency = 0
-    end
-
     return moduleButton
 end
 
@@ -820,12 +862,16 @@ local function updateModuleList(moduleFrame, categoryName)
             moduleButton:SetAttribute("ModuleIndex", index)
             moduleButton.Parent = moduleFrame
 
+            -- ИСПРАВЛЕНО: Показываем настройки только для действительно включенного модуля
             if moduleData.enabled then
                 local activeLine = moduleButton:FindFirstChild("Frame")
                 local moduleName = moduleButton:FindFirstChild("TextLabel")
 
                 moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
-                if activeLine then activeLine.Visible = true end
+                if activeLine then 
+                    activeLine.Transparency = 0
+                    activeLine.Size = UDim2.new(0, 2, 1, -20)
+                end
                 if moduleName then moduleName.TextColor3 = Color3.fromRGB(255, 75, 75) end
 
                 slashLabel.Visible = true
@@ -833,6 +879,11 @@ local function updateModuleList(moduleFrame, categoryName)
                 moduleNameLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
                 moduleSystem.activeModuleName = moduleData.name
                 showModuleSettings(moduleData.name)
+                
+                -- ВАЖНО: Применяем onEnable только если модуль не был уже инициализирован
+                if API.callbacks[moduleData.name] and API.callbacks[moduleData.name].onEnable then
+                    pcall(API.callbacks[moduleData.name].onEnable)
+                end
             end
         end
     end
@@ -1056,6 +1107,9 @@ local function createUI()
             activeCategoryLabel.Text = name
             slashLabel.Visible = false
             moduleNameLabel.Text = ""
+            
+            -- ИСПРАВЛЕНО: Очищаем контейнер настроек при смене категории
+            clearSettingsContainer()
 
             updateModuleList(moduleList, name)
         end)
@@ -1082,6 +1136,11 @@ local function createUI()
     _G.mainFrame = mainFrame
 end
 
+-- НОВАЯ ФУНКЦИЯ: Регистрация callback'ов модуля
+function API:registerCallback(moduleName, callbacks)
+    self.callbacks[moduleName] = callbacks
+end
+
 local function init(config)
     if config and config.moduleSystem then
         for k,v in pairs(config.moduleSystem) do
@@ -1097,6 +1156,9 @@ local function init(config)
     end
 
     createUI()
+    
+    -- НОВОЕ: Загружаем и применяем все сохраненные настройки после создания UI
+    API:loadSettings()
 end
 
 return {
