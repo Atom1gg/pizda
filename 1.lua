@@ -360,7 +360,7 @@ local function createDropDown(parent, setting, position)
 end
 
 local function createTextField(parent, setting, position)
-    local frame = Instance.new("Frame")
+        local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0, 280, 0, 50)
     frame.Position = position
     frame.BackgroundTransparency = 1
@@ -379,8 +379,7 @@ local function createTextField(parent, setting, position)
 
     local textBoxBackground = Instance.new("Frame")
     textBoxBackground.Size = UDim2.new(0, 120, 0, 30)
-    -- ИСПРАВЛЕНО: Правильное позиционирование
-    textBoxBackground.Position = UDim2.new(0.6, 10, 0.3, -5)
+    textBoxBackground.Position = UDim2.new(0.7, 280, 0.5, -15)
     textBoxBackground.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
     textBoxBackground.BorderSizePixel = 0
     textBoxBackground.Parent = frame
