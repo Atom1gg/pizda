@@ -9,18 +9,27 @@ local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 
 _G.mainFrame = nil
+_G.isGUIVisible = false
+_G.keySystemPassed = false
 
 local activeCategoryLabel
 local moduleNameLabel
 local slashLabel
 local openDropdowns = {}
 
+-- Настройки стиля для ключ системы
+local ACCENT_COLOR = Color3.fromRGB(255, 75, 75)
+local TEXT_COLOR = Color3.fromRGB(200, 200, 200)
+local BG_COLOR = Color3.fromRGB(20, 20, 22)
+local DARK_BG = Color3.fromRGB(15, 15, 17)
+local ELEMENT_COLOR = Color3.fromRGB(30, 30, 32)
+
 local API = {
     modules = {},
     settings = {},
     callbacks = {},
     savedSettings = {},
-    savedModuleStates = {} -- НОВОЕ: отдельное сохранение состояний модулей
+    savedModuleStates = {}
 }
 
 local function closeAllDropdowns(except)
@@ -35,7 +44,7 @@ local function closeAllDropdowns(except)
     end
 end
 
--- ИСПРАВЛЕНО: Улучшенная система сохранения
+-- Система сохранения настроек
 local function saveSettings()
     local success, err = pcall(function()
         local dataToSave = {
@@ -49,7 +58,6 @@ local function saveSettings()
     end
 end
 
--- ИСПРАВЛЕНО: Улучшенная система загрузки
 local function loadSettings()
     local success, result = pcall(function()
         if isfile("UmbrellaHub.json") then
@@ -58,9 +66,7 @@ local function loadSettings()
         return {}
     end)
     if success and result then
-        -- Загружаем настройки модулей
         API.savedSettings = result.settings or {}
-        -- Загружаем состояния модулей (включен/выключен)
         API.savedModuleStates = result.moduleStates or {}
     else
         warn("Failed to load settings:", result)
@@ -69,17 +75,303 @@ local function loadSettings()
     end
 end
 
--- Загружаем настройки при старте
 loadSettings()
+
+-- Система уведомлений
+local notificationsGui = Instance.new("ScreenGui")
+notificationsGui.Name = "UmbrellaNotifications"
+notificationsGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+notificationsGui.Parent = player:WaitForChild("PlayerGui")
+
+local notificationsFrame = Instance.new("Frame")
+notificationsFrame.Size = UDim2.new(0, 300, 0, 200)
+notificationsFrame.Position = UDim2.new(0.5, -150, 0.1, 0)
+notificationsFrame.BackgroundTransparency = 1
+notificationsFrame.Parent = notificationsGui
+
+local notificationsLayout = Instance.new("UIListLayout")
+notificationsLayout.Padding = UDim.new(0, 10)
+notificationsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+notificationsLayout.Parent = notificationsFrame
+
+local activeNotifications = 0
+local maxNotifications = 3
+
+local function showNotification(text, color, duration)
+    if activeNotifications >= maxNotifications then return end
+    
+    activeNotifications += 1
+    
+    local notification = Instance.new("Frame")
+    notification.Size = UDim2.new(0, 280, 0, 40)
+    notification.BackgroundColor3 = ELEMENT_COLOR
+    notification.BackgroundTransparency = 1
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = notification
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -20, 1, -10)
+    label.Position = UDim2.new(0, 10, 0, 5)
+    label.Text = text
+    label.TextColor3 = color or TEXT_COLOR
+    label.Font = Enum.Font.GothamMedium
+    label.TextSize = 14
+    label.BackgroundTransparency = 1
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = notification
+    
+    notification.Parent = notificationsFrame
+    
+    -- Анимация появления
+    local tweenIn = TweenService:Create(notification, TweenInfo.new(0.3), {BackgroundTransparency = 0})
+    tweenIn:Play()
+    
+    -- Автоматическое скрытие
+    task.delay(duration or 3, function()
+        local tweenOut = TweenService:Create(notification, TweenInfo.new(0.3), {BackgroundTransparency = 1})
+        tweenOut:Play()
+        tweenOut.Completed:Wait()
+        notification:Destroy()
+        activeNotifications -= 1
+    end)
+end
+
+-- Создание ключ системы
+local function createKeySystem()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "PremiumLoader"
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.Parent = player:WaitForChild("PlayerGui")
+
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 240, 0, 140)
+    mainFrame.Position = UDim2.new(0.5, -120, 0.5, -70)
+    mainFrame.BackgroundColor3 = DARK_BG
+    mainFrame.ClipsDescendants = true
+    mainFrame.Parent = gui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = mainFrame
+
+    local icon = Instance.new("ImageLabel")
+    icon.Name = "LoaderIcon"
+    icon.Image = "http://www.roblox.com/asset/?id=95285379105237"
+    icon.Size = UDim2.new(0, 70, 0, 70)
+    icon.Position = UDim2.new(0.5, -5, 0.3, 0)
+    icon.AnchorPoint = Vector2.new(0.5, 0.5)
+    icon.BackgroundTransparency = 1
+    icon.Parent = mainFrame
+
+    local progressBar = Instance.new("Frame")
+    progressBar.Size = UDim2.new(0.8, 0, 0, 5)
+    progressBar.Position = UDim2.new(0.1, 0, 0.65, 0)
+    progressBar.BackgroundColor3 = ELEMENT_COLOR
+    progressBar.Parent = mainFrame
+
+    local progressCorner = Instance.new("UICorner")
+    progressCorner.CornerRadius = UDim.new(0, 3)
+    progressCorner.Parent = progressBar
+
+    local progressFill = Instance.new("Frame")
+    progressFill.Size = UDim2.new(0, 0, 1, 0)
+    progressFill.BackgroundColor3 = ACCENT_COLOR
+    progressFill.Parent = progressBar
+
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(0, 3)
+    fillCorner.Parent = progressFill
+
+    local keyInput = Instance.new("TextBox")
+    keyInput.Size = UDim2.new(0.8, 0, 0, 40)
+    keyInput.Position = UDim2.new(0.1, 0, 0.55, -12)
+    keyInput.BackgroundColor3 = ELEMENT_COLOR
+    keyInput.TextColor3 = TEXT_COLOR
+    keyInput.Text = ""
+    keyInput.PlaceholderText = "Enter access key..."
+    keyInput.PlaceholderColor3 = Color3.fromRGB(120, 120, 120)
+    keyInput.Font = Enum.Font.Gotham
+    keyInput.TextSize = 14
+    keyInput.Visible = false
+    keyInput.Parent = mainFrame
+
+    local inputCorner = Instance.new("UICorner")
+    inputCorner.CornerRadius = UDim.new(0, 6)
+    inputCorner.Parent = keyInput
+
+    local function createButton(name, posX)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0.35, 0, 0, 36)
+        btn.Position = UDim2.new(posX, 0, 0.8, -15)
+        btn.Text = name
+        btn.TextColor3 = name == "Confirm" and Color3.new(1,1,1) or ACCENT_COLOR
+        btn.BackgroundColor3 = name == "Confirm" and ACCENT_COLOR or ELEMENT_COLOR
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 14
+        btn.AutoButtonColor = false
+        btn.Visible = false
+        
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(0, 6)
+        btnCorner.Parent = btn
+        
+        btn.Parent = mainFrame
+        return btn
+    end
+
+    local btnGetKey = createButton("Get key", 0.1)
+    local btnConfirm = createButton("Confirm", 0.55)
+
+    -- Анимация иконки
+    local currentTween = nil
+    local isAnimating = false
+
+    local function spinIcon(direction, callback)
+        if currentTween then
+            currentTween:Cancel()
+        end
+        
+        local rot = direction == "left" and 360 or -360
+        currentTween = TweenService:Create(icon, 
+            TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), 
+            {Rotation = rot}
+        )
+        currentTween:Play()
+        
+        if callback then
+            currentTween.Completed:Connect(callback)
+        end
+    end
+
+    local function startIconLoop()
+        if isAnimating then return end
+        isAnimating = true
+        
+        coroutine.wrap(function()
+            while isAnimating do
+                spinIcon("left")
+                task.wait(2)
+                
+                if not isAnimating then break end
+                
+                spinIcon("right") 
+                task.wait(2)
+            end
+        end)()
+    end
+
+    local function stopIconLoop()
+        isAnimating = false
+        if currentTween then
+            currentTween:Cancel()
+        end
+    end
+
+    -- Главная анимация загрузки
+    coroutine.wrap(function()
+        local fillTween = TweenService:Create(progressFill, TweenInfo.new(2, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 1, 0)})
+        fillTween:Play()
+        
+        spinIcon("left", function()
+            spinIcon("right", function()
+                local expandTween = TweenService:Create(mainFrame, TweenInfo.new(0.5), {Size = UDim2.new(0, 240, 0, 220)})
+                expandTween:Play()
+                expandTween.Completed:Wait()
+                
+                local hideProgress = TweenService:Create(progressBar, TweenInfo.new(0.3), {BackgroundTransparency = 1})
+                local hideFill = TweenService:Create(progressFill, TweenInfo.new(0.3), {BackgroundTransparency = 1})
+                hideProgress:Play()
+                hideFill:Play()
+                hideProgress.Completed:Wait()
+                
+                keyInput.Visible = true
+                btnGetKey.Visible = true
+                btnConfirm.Visible = true
+                
+                TweenService:Create(keyInput, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
+                TweenService:Create(btnGetKey, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
+                TweenService:Create(btnConfirm, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
+                
+                task.wait(0.5)
+                startIconLoop()
+            end)
+        end)
+    end)()
+
+    -- Обработчики кнопок
+    btnGetKey.MouseEnter:Connect(function() 
+        TweenService:Create(btnGetKey, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(45, 45, 47)}):Play()
+    end)
+
+    btnGetKey.MouseLeave:Connect(function() 
+        TweenService:Create(btnGetKey, TweenInfo.new(0.2), {BackgroundColor3 = ELEMENT_COLOR}):Play()
+    end)
+
+    btnGetKey.MouseButton1Click:Connect(function()
+        setclipboard("https://discord.gg/hjXQM4X3vq")
+        showNotification("Discord link copied to clipboard!", Color3.fromRGB(100, 255, 100))
+    end)
+
+    btnConfirm.MouseEnter:Connect(function() 
+        TweenService:Create(btnConfirm, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 90, 90)}):Play()
+    end)
+
+    btnConfirm.MouseLeave:Connect(function() 
+        TweenService:Create(btnConfirm, TweenInfo.new(0.2), {BackgroundColor3 = ACCENT_COLOR}):Play()
+    end)
+
+    btnConfirm.MouseButton1Click:Connect(function()
+        if keyInput.Text == "UmbrellaHub2025" then
+            showNotification("Access granted! Loading...", Color3.fromRGB(100, 255, 100))
+            
+            task.wait(1)
+            TweenService:Create(mainFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
+            
+            for _, child in pairs(mainFrame:GetChildren()) do
+                if child:IsA("GuiObject") then
+                    TweenService:Create(child, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
+                    if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
+                        TweenService:Create(child, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
+                    elseif child:IsA("ImageLabel") then
+                        TweenService:Create(child, TweenInfo.new(0.5), {ImageTransparency = 1}):Play()
+                    end
+                end
+            end
+            
+            task.wait(0.5)
+            stopIconLoop()
+            mainFrame:Destroy()
+            
+            task.wait(2.5)
+            if gui and gui.Parent then
+                gui:Destroy()
+            end
+            
+            -- Устанавливаем флаг что ключ пройден и запускаем основной UI
+            _G.keySystemPassed = true
+            createMainUI()
+            
+        else
+            showNotification("Invalid key! Try again.", ACCENT_COLOR)
+            keyInput.Text = ""
+        end
+    end)
+
+    gui.AncestryChanged:Connect(function()
+        if not gui.Parent then
+            stopIconLoop()
+        end
+    end)
+end
 
 function API:registerModule(category, moduleData)
     self.modules[category] = self.modules[category] or {}
     table.insert(self.modules[category], moduleData)
     
-    -- НОВОЕ: Загружаем сохраненное состояние модуля
     if self.savedModuleStates[moduleData.name] ~= nil then
         moduleData.enabled = self.savedModuleStates[moduleData.name]
-        -- Если модуль был включен, вызываем onEnable
         if moduleData.enabled and self.callbacks[moduleData.name] and self.callbacks[moduleData.name].onEnable then
             pcall(self.callbacks[moduleData.name].onEnable)
         end
@@ -89,12 +381,10 @@ end
 function API:registerSettings(moduleName, settingsTable)
     self.settings[moduleName] = {settings = settingsTable}
     
-    -- ИСПРАВЛЕНО: Правильная загрузка сохраненных значений
     if API.savedSettings[moduleName] then
         for _, setting in ipairs(settingsTable) do
             if API.savedSettings[moduleName][setting.name] ~= nil then
                 setting.default = API.savedSettings[moduleName][setting.name]
-                -- НОВОЕ: Сразу применяем загруженное значение через callback
                 if setting.callback then
                     pcall(setting.callback, setting.default)
                 end
@@ -119,6 +409,28 @@ local function tweenColor(object, property, targetColor, duration)
         Enum.EasingDirection.Out
     )
     local tween = TweenService:Create(object, tweenInfo, {[property] = targetColor})
+    tween:Play()
+    return tween
+end
+
+local function tweenTransparency(object, property, targetValue, duration)
+    local tweenInfo = TweenInfo.new(
+        duration or 0.2,
+        Enum.EasingStyle.Quad,
+        Enum.EasingDirection.Out
+    )
+    local tween = TweenService:Create(object, tweenInfo, {[property] = targetValue})
+    tween:Play()
+    return tween
+end
+
+local function tweenSize(object, property, targetSize, duration)
+    local tweenInfo = TweenInfo.new(
+        duration or 0.2,
+        Enum.EasingStyle.Quad,
+        Enum.EasingDirection.Out
+    )
+    local tween = TweenService:Create(object, tweenInfo, {[property] = targetSize})
     tween:Play()
     return tween
 end
@@ -199,28 +511,7 @@ local function createScrollableContainer(parent, size, position, padding)
     return scrollFrame, container
 end
 
-local function tweenTransparency(object, property, targetValue, duration)
-    local tweenInfo = TweenInfo.new(
-        duration or 0.2,
-        Enum.EasingStyle.Quad,
-        Enum.EasingDirection.Out
-    )
-    local tween = TweenService:Create(object, tweenInfo, {[property] = targetValue})
-    tween:Play()
-    return tween
-end
-
-local function tweenSize(object, property, targetSize, duration)
-    local tweenInfo = TweenInfo.new(
-        duration or 0.2,
-        Enum.EasingStyle.Quad,
-        Enum.EasingDirection.Out
-    )
-    local tween = TweenService:Create(object, tweenInfo, {[property] = targetSize})
-    tween:Play()
-    return tween
-end
-
+-- Создание элементов настроек (dropdown, textfield, slider, toggle)
 local function createDropDown(parent, setting, position)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0, 280, 0, 50)
@@ -360,7 +651,7 @@ local function createDropDown(parent, setting, position)
 end
 
 local function createTextField(parent, setting, position)
-        local frame = Instance.new("Frame")
+    local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0, 280, 0, 50)
     frame.Position = position
     frame.BackgroundTransparency = 1
@@ -490,7 +781,6 @@ local function createSlider(parent, setting, position)
         sliderActive.Size = UDim2.new(relativePos, 0, 1, 0)
         valueDisplay.Text = tostring(value) .. (setting.isPercentage and "%" or "")
         
-        -- ИСПРАВЛЕНО: Debounce для сохранения (не сохраняем при каждом движении)
         local currentTime = tick()
         debounceTime = currentTime
         task.delay(0.5, function()
@@ -560,7 +850,6 @@ local function createToggle(parent, setting, position)
 
     local switchTrack = Instance.new("Frame")
     switchTrack.Size = UDim2.new(0, 40, 0, 20)
-    -- ИСПРАВЛЕНО: Правильное позиционирование
     switchTrack.Position = UDim2.new(0.6, 30, 0.5, -10)
     switchTrack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     switchTrack.BorderSizePixel = 0
@@ -582,7 +871,6 @@ local function createToggle(parent, setting, position)
     circleCorner.Parent = switchCircle
 
     local isEnabled = setting.default
-    -- ИСПРАВЛЕНО: Применяем загруженное состояние к UI
     if isEnabled then
         switchCircle.Position = UDim2.new(1, -19, 0, 1)
         switchCircle.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
@@ -635,7 +923,6 @@ function API:loadSettings()
     end
 end
 
--- НОВАЯ ФУНКЦИЯ: Сохранение состояния модуля
 local function saveModuleState(moduleName, enabled)
     API.savedModuleStates[moduleName] = enabled
     saveSettings()
@@ -733,7 +1020,6 @@ local function createModuleButton(parent, moduleData)
 
     local debounce = false
 
-    -- ИСПРАВЛЕНО: Применяем сохраненное состояние модуля к UI при создании
     if moduleData.enabled then
         moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
         moduleName.TextColor3 = Color3.fromRGB(255, 75, 75)
@@ -759,7 +1045,6 @@ local function createModuleButton(parent, moduleData)
         if debounce then return end
         debounce = true
 
-        -- Отключаем все остальные модули в категории
         for _, otherButton in pairs(parent:GetChildren()) do
             if otherButton:IsA("Frame") and otherButton ~= moduleButton then
                 local otherLine = otherButton:FindFirstChild("Frame")
@@ -781,7 +1066,6 @@ local function createModuleButton(parent, moduleData)
                         if otherModule and otherModule.enabled then
                             otherModule.enabled = false
                             saveModuleState(otherModule.name, false)
-                            -- Вызываем onDisable для отключенного модуля
                             if API.callbacks[otherModule.name] and API.callbacks[otherModule.name].onDisable then
                                 pcall(API.callbacks[otherModule.name].onDisable)
                             end
@@ -798,7 +1082,7 @@ local function createModuleButton(parent, moduleData)
         end
 
         moduleData.enabled = not moduleData.enabled
-        saveModuleState(moduleData.name, moduleData.enabled) -- НОВОЕ: Сохраняем состояние
+        saveModuleState(moduleData.name, moduleData.enabled)
 
         if moduleData.enabled then
             tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
@@ -861,7 +1145,6 @@ local function updateModuleList(moduleFrame, categoryName)
             moduleButton:SetAttribute("ModuleIndex", index)
             moduleButton.Parent = moduleFrame
 
-            -- ИСПРАВЛЕНО: Показываем настройки только для действительно включенного модуля
             if moduleData.enabled then
                 local activeLine = moduleButton:FindFirstChild("Frame")
                 local moduleName = moduleButton:FindFirstChild("TextLabel")
@@ -879,7 +1162,6 @@ local function updateModuleList(moduleFrame, categoryName)
                 moduleSystem.activeModuleName = moduleData.name
                 showModuleSettings(moduleData.name)
                 
-                -- ВАЖНО: Применяем onEnable только если модуль не был уже инициализирован
                 if API.callbacks[moduleData.name] and API.callbacks[moduleData.name].onEnable then
                     pcall(API.callbacks[moduleData.name].onEnable)
                 end
@@ -888,7 +1170,113 @@ local function updateModuleList(moduleFrame, categoryName)
     end
 end
 
-local function createUI()
+-- Функция для переключения видимости GUI
+local function toggleGUI()
+    if not _G.keySystemPassed or not _G.mainFrame then return end
+    
+    _G.isGUIVisible = not _G.isGUIVisible
+    
+    if _G.isGUIVisible then
+        _G.mainFrame.Visible = true
+        TweenService:Create(_G.mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+            Size = UDim2.new(0, 900, 0, 600),
+            Position = UDim2.new(0.5, -450, 0.5, -300)
+        }):Play()
+    else
+        TweenService:Create(_G.mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+            Size = UDim2.new(0, 0, 0, 0),
+            Position = UDim2.new(0.5, 0, 0.5, 0)
+        }):Play()
+        
+        task.wait(0.3)
+        _G.mainFrame.Visible = false
+        showNotification("Press Left Alt to open GUI", Color3.fromRGB(100, 255, 100), 2)
+    end
+end
+
+-- Создание иконки-кнопки для открытия GUI
+local function createToggleButton()
+    if not _G.keySystemPassed then return end
+    
+    local toggleGui = Instance.new("ScreenGui")
+    toggleGui.Name = "UmbrellaToggle"
+    toggleGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    toggleGui.Parent = player:WaitForChild("PlayerGui")
+    
+    local toggleButton = Instance.new("ImageButton")
+    toggleButton.Name = "ToggleButton"
+    toggleButton.Size = UDim2.new(0, 50, 0, 50)
+    toggleButton.Position = UDim2.new(0, 20, 0, 20)
+    toggleButton.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+    toggleButton.Image = "http://www.roblox.com/asset/?id=95285379105237"
+    toggleButton.BorderSizePixel = 0
+    toggleButton.Parent = toggleGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = toggleButton
+    
+    -- Анимации для кнопки
+    toggleButton.MouseEnter:Connect(function()
+        TweenService:Create(toggleButton, TweenInfo.new(0.2), {
+            Size = UDim2.new(0, 55, 0, 55),
+            BackgroundColor3 = Color3.fromRGB(22, 28, 30)
+        }):Play()
+    end)
+    
+    toggleButton.MouseLeave:Connect(function()
+        TweenService:Create(toggleButton, TweenInfo.new(0.2), {
+            Size = UDim2.new(0, 50, 0, 50),
+            BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+        }):Play()
+    end)
+    
+    toggleButton.MouseButton1Click:Connect(function()
+        toggleGUI()
+    end)
+    
+    -- Делаем кнопку перетаскиваемой
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
+    
+    toggleButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = toggleButton.Position
+        end
+    end)
+    
+    toggleButton.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    UIS.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            toggleButton.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
+-- Обработка нажатия Left Alt для переключения GUI
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.LeftAlt then
+        toggleGUI()
+    end
+end)
+
+function createMainUI()
     local Players = game:GetService("Players")
     local player = Players.LocalPlayer
 
@@ -897,10 +1285,11 @@ local function createUI()
     screenGui.Parent = player:WaitForChild("PlayerGui")
 
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 900, 0, 600)
-    mainFrame.Position = UDim2.new(0.5, -450, 0.5, -300)
+    mainFrame.Size = UDim2.new(0, 0, 0, 0)
+    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     mainFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
     mainFrame.BorderSizePixel = 0
+    mainFrame.Visible = false
     mainFrame.Parent = screenGui
 
     local mainCorner = Instance.new("UICorner")
@@ -1107,9 +1496,7 @@ local function createUI()
             slashLabel.Visible = false
             moduleNameLabel.Text = ""
             
-            -- ИСПРАВЛЕНО: Очищаем контейнер настроек при смене категории
             clearSettingsContainer()
-
             updateModuleList(moduleList, name)
         end)
     end
@@ -1133,9 +1520,20 @@ local function createUI()
     settingsCorner.Parent = settingsContainer
 
     _G.mainFrame = mainFrame
+    _G.isGUIVisible = true
+    
+    -- Показываем GUI с анимацией
+    mainFrame.Visible = true
+    TweenService:Create(mainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {
+        Size = UDim2.new(0, 900, 0, 600),
+        Position = UDim2.new(0.5, -450, 0.5, -300)
+    }):Play()
+    
+    -- Создаем кнопку переключения после создания основного UI
+    task.wait(0.5)
+    createToggleButton()
 end
 
--- НОВАЯ ФУНКЦИЯ: Регистрация callback'ов модуля
 function API:registerCallback(moduleName, callbacks)
     self.callbacks[moduleName] = callbacks
 end
@@ -1154,9 +1552,14 @@ local function init(config)
         end
     end
 
-    createUI()
+    -- Сначала показываем ключ систему
+    if not _G.keySystemPassed then
+        createKeySystem()
+    else
+        -- Если ключ уже пройден, сразу создаем основной UI
+        createMainUI()
+    end
     
-    -- НОВОЕ: Загружаем и применяем все сохраненные настройки после создания UI
     API:loadSettings()
 end
 
