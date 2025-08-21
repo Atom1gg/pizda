@@ -1557,6 +1557,20 @@ function createMainUI()
     createToggleButton()
 end
 
+-- >>> CHANGED: Global keybind handler
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        local pressedKey = input.KeyCode.Name
+        for moduleName, keyName in pairs(API.savedKeybinds) do
+            if keyName ~= "None" and keyName == pressedKey then
+                local currentState = API.savedModuleStates[moduleName] or false
+                applyModuleState(moduleName, not currentState, true)
+            end
+        end
+    end
+end)
+
 function API:registerCallback(moduleName, callbacks)
     self.callbacks[moduleName] = callbacks
 end
