@@ -368,12 +368,35 @@ end
 
 function API:registerModule(category, moduleData)
     self.modules[category] = self.modules[category] or {}
+    
+    -- Автоматически создаем настройку тоггла для каждого модуля
+    if not self.settings[moduleData.name] then
+        self.settings[moduleData.name] = {
+            settings = {
+                {
+                    name = "Enabled",
+                    type = "toggle",
+                    default = moduleData.enabled or false,
+                    callback = function(value)
+                        moduleData.enabled = value
+                        saveModuleState(moduleData.name, value)
+                        if moduleData.callback then
+                            pcall(moduleData.callback, value)
+                        end
+                    end
+                }
+            }
+        }
+    end
+    
     table.insert(self.modules[category], moduleData)
     
+    -- Загружаем сохраненное состояние
     if self.savedModuleStates[moduleData.name] ~= nil then
         moduleData.enabled = self.savedModuleStates[moduleData.name]
-        if moduleData.enabled and self.callbacks[moduleData.name] and self.callbacks[moduleData.name].onEnable then
-            pcall(self.callbacks[moduleData.name].onEnable)
+        -- Автоматически применяем состояние при загрузке
+        if moduleData.enabled and moduleData.callback then
+            pcall(moduleData.callback, true)
         end
     end
 end
@@ -909,6 +932,23 @@ end
 function API:loadSettings()
     loadSettings()
     
+    -- Применяем сохраненные состояния модулей при загрузке
+    for moduleName, enabled in pairs(self.savedModuleStates) do
+        for category, modules in pairs(self.modules) do
+            for _, module in ipairs(modules) do
+                if module.name == moduleName then
+                    module.enabled = enabled
+                    -- Автоматически включаем модуль если он был включен
+                    if enabled and module.callback then
+                        pcall(module.callback, true)
+                    end
+                    break
+                end
+            end
+        end
+    end
+    
+    -- Загружаем остальные настройки
     for moduleName, settings in pairs(self.settings) do
         if self.savedSettings[moduleName] then
             for _, setting in ipairs(settings.settings) do
@@ -926,6 +966,19 @@ end
 local function saveModuleState(moduleName, enabled)
     API.savedModuleStates[moduleName] = enabled
     saveSettings()
+    
+    -- Немедленно применяем изменение состояния
+    for category, modules in pairs(API.modules) do
+        for _, module in ipairs(modules) do
+            if module.name == moduleName then
+                module.enabled = enabled
+                if module.callback then
+                    pcall(module.callback, enabled)
+                end
+                break
+            end
+        end
+    end
 end
 
 local function showModuleSettings(moduleName)
