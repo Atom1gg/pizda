@@ -323,7 +323,7 @@ local function createKeySystem()
     end)
 
     btnConfirm.MouseButton1Click:Connect(function()
-        if keyInput.Text == "UMBRELLA2023" then
+        if keyInput.Text == "UmbrellaHub2025" then
             showNotification("Access granted! Loading...", Color3.fromRGB(100, 255, 100))
             
             task.wait(1)
@@ -1177,74 +1177,24 @@ local function toggleGUI()
     _G.isGUIVisible = not _G.isGUIVisible
     
     if _G.isGUIVisible then
-        -- Показываем GUI через прозрачность
         _G.mainFrame.Visible = true
-        
-        -- Анимируем прозрачность только нужных элементов
-        local function animateShow(obj)
-            if obj:IsA("Frame") then
-                -- Анимируем только основные фреймы
-                if obj.Name == "categoryFrame" or obj.Name == "ModuleFrame" or obj == _G.mainFrame then
-                    TweenService:Create(obj, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-                        BackgroundTransparency = 0
-                    }):Play()
-                end
-            elseif obj:IsA("TextLabel") or obj:IsA("ImageLabel") then
-                if obj:IsA("TextLabel") then
-                    TweenService:Create(obj, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-                        TextTransparency = 0
-                    }):Play()
-                elseif obj:IsA("ImageLabel") then
-                    TweenService:Create(obj, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-                        ImageTransparency = 0
-                    }):Play()
-                end
-            end
-            
-            for _, child in pairs(obj:GetChildren()) do
-                animateShow(child)
-            end
-        end
-        
-        animateShow(_G.mainFrame)
-        
+        TweenService:Create(_G.mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+            Size = UDim2.new(0, 900, 0, 600),
+            Position = UDim2.new(0.5, -450, 0.5, -300)
+        }):Play()
     else
-        -- Скрываем GUI через прозрачность
-        local function animateHide(obj)
-            if obj:IsA("Frame") then
-                -- Анимируем только основные фреймы
-                if obj.Name == "categoryFrame" or obj.Name == "ModuleFrame" or obj == _G.mainFrame then
-                    TweenService:Create(obj, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-                        BackgroundTransparency = 1
-                    }):Play()
-                end
-            elseif obj:IsA("TextLabel") or obj:IsA("ImageLabel") then
-                if obj:IsA("TextLabel") then
-                    TweenService:Create(obj, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-                        TextTransparency = 1
-                    }):Play()
-                elseif obj:IsA("ImageLabel") then
-                    TweenService:Create(obj, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-                        ImageTransparency = 1
-                    }):Play()
-                end
-            end
-            
-            for _, child in pairs(obj:GetChildren()) do
-                animateHide(child)
-            end
-        end
+        TweenService:Create(_G.mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+            Size = UDim2.new(0, 0, 0, 0),
+            Position = UDim2.new(0.5, 0, 0.5, 0)
+        }):Play()
         
-        animateHide(_G.mainFrame)
-        
-        -- Скрываем frame после анимации
         task.wait(0.3)
         _G.mainFrame.Visible = false
         showNotification("Press Left Alt to open GUI", Color3.fromRGB(100, 255, 100), 2)
     end
 end
 
--- Создание иконки-кнопки для открытия GUI (ОБНОВЛЕНО)
+-- Создание иконки-кнопки для открытия GUI
 local function createToggleButton()
     if not _G.keySystemPassed then return end
     
@@ -1281,53 +1231,50 @@ local function createToggleButton()
         }):Play()
     end)
     
-    -- Переменные для отслеживания драга и клика
-    local isDragging = false
+    toggleButton.MouseButton1Click:Connect(function()
+        toggleGUI()
+    end)
+    
+    -- Делаем кнопку перетаскиваемой
+    local dragging = false
     local dragStart = nil
     local startPos = nil
-    local dragThreshold = 5 -- Минимальное расстояние для определения драга
     
     toggleButton.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            isDragging = false
+            dragging = true
             dragStart = input.Position
             startPos = toggleButton.Position
         end
     end)
     
-    toggleButton.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement and dragStart then
-            local delta = input.Position - dragStart
-            
-            -- Проверяем, превышает ли движение порог драга
-            if math.abs(delta.X) > dragThreshold or math.abs(delta.Y) > dragThreshold then
-                isDragging = true
-                
-                -- Обновляем позицию кнопки
-                toggleButton.Position = UDim2.new(
-                    startPos.X.Scale,
-                    startPos.X.Offset + delta.X,
-                    startPos.Y.Scale,
-                    startPos.Y.Offset + delta.Y
-                )
-            end
+    toggleButton.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
         end
     end)
     
-    toggleButton.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            -- Если не было драга, то это клик - переключаем GUI
-            if not isDragging then
-                toggleGUI()
-            end
-            
-            -- Сбрасываем переменные
-            isDragging = false
-            dragStart = nil
-            startPos = nil
+    UIS.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            toggleButton.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
         end
     end)
 end
+
+-- Обработка нажатия Left Alt для переключения GUI
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.LeftAlt then
+        toggleGUI()
+    end
+end)
 
 function createMainUI()
     local Players = game:GetService("Players")
@@ -1338,34 +1285,16 @@ function createMainUI()
     screenGui.Parent = player:WaitForChild("PlayerGui")
 
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 900, 0, 600)
-    mainFrame.Position = UDim2.new(0.5, -450, 0.5, -300)
+    mainFrame.Size = UDim2.new(0, 0, 0, 0)
+    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     mainFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
     mainFrame.BorderSizePixel = 0
-    mainFrame.Visible = true
-    mainFrame.BackgroundTransparency = 1 -- Начинаем с полной прозрачности
+    mainFrame.Visible = false
     mainFrame.Parent = screenGui
 
     local mainCorner = Instance.new("UICorner")
     mainCorner.CornerRadius = UDim.new(0, 8)
     mainCorner.Parent = mainFrame
-
-    -- Делаем все элементы изначально прозрачными
-    local function setInitialTransparency(obj)
-        if obj:IsA("Frame") or obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("ImageLabel") then
-            obj.BackgroundTransparency = 1
-            
-            if obj:IsA("TextLabel") or obj:IsA("TextButton") then
-                obj.TextTransparency = 1
-            elseif obj:IsA("ImageLabel") then
-                obj.ImageTransparency = 1
-            end
-        end
-        
-        for _, child in pairs(obj:GetChildren()) do
-            setInitialTransparency(child)
-        end
-    end
 
     local dragging = false
     local dragStart
