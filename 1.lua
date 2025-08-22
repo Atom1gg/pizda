@@ -1,6 +1,3 @@
--- Umbrella UI Library (Full) — with integrated toggle-bind & per-player save
--- Base: user's 123.txt (kept full), changes are annotated with ">>> CHANGED" comments.
-
 local player = game:GetService("Players").LocalPlayer
 local existingUI = player.PlayerGui:FindFirstChild("MyUI")
 if existingUI then
@@ -20,41 +17,20 @@ local moduleNameLabel
 local slashLabel
 local openDropdowns = {}
 
--- Style
+-- Настройки стиля для ключ системы
 local ACCENT_COLOR = Color3.fromRGB(255, 75, 75)
-local TEXT_COLOR   = Color3.fromRGB(200, 200, 200)
-local BG_COLOR     = Color3.fromRGB(20, 20, 22)
-local DARK_BG      = Color3.fromRGB(15, 15, 17)
-local ELEMENT_COLOR= Color3.fromRGB(30, 30, 32)
+local TEXT_COLOR = Color3.fromRGB(200, 200, 200)
+local BG_COLOR = Color3.fromRGB(20, 20, 22)
+local DARK_BG = Color3.fromRGB(15, 15, 17)
+local ELEMENT_COLOR = Color3.fromRGB(30, 30, 32)
 
--- >>> CHANGED: added savedKeybinds; everything else preserved
 local API = {
     modules = {},
     settings = {},
     callbacks = {},
     savedSettings = {},
-    savedModuleStates = {},
-    savedKeybinds = {} -- [moduleName] = "KeyCodeName"
+    savedModuleStates = {}
 }
-
--- >>> CHANGED: per-player save path helpers
-local function getSaveFolder()
-    local folder = "UmbrellaHub"
-    if not isfolder or not createfolder then
-        return folder -- fallback if env has only writefile
-    end
-    if not isfolder(folder) then
-        pcall(function() createfolder(folder) end)
-    end
-    return folder
-end
-
-local function getSavePath()
-    local folder = getSaveFolder()
-    local nick = tostring(player and player.Name or "Player")
-    local filename = "Umbrella_" .. nick .. ".json"
-    return folder .. "/" .. filename
-end
 
 local function closeAllDropdowns(except)
     for _, dropdown in pairs(openDropdowns) do
@@ -68,18 +44,26 @@ local function closeAllDropdowns(except)
     end
 end
 
--- =======================
--- Saving / Loading
--- =======================
+-- Система сохранения настроек с папкой пользователя
+local function getPlayerDataPath()
+    local playerName = player.Name
+    return "Umbrella/User_" .. playerName .. ".json"
+end
+
 local function saveSettings()
     local success, err = pcall(function()
         local dataToSave = {
-            settings      = API.savedSettings,
-            moduleStates  = API.savedModuleStates,
-            keybinds      = API.savedKeybinds  -- >>> CHANGED
+            settings = API.savedSettings,
+            moduleStates = API.savedModuleStates
         }
-        local path = getSavePath()            -- >>> CHANGED
-        writefile(path, HttpService:JSONEncode(dataToSave))
+        
+        -- Создаем папку если её нет
+        if not isfolder("Umbrella") then
+            makefolder("Umbrella")
+        end
+        
+        local filePath = getPlayerDataPath()
+        writefile(filePath, HttpService:JSONEncode(dataToSave))
     end)
     if not success then
         warn("Failed to save settings:", err)
@@ -88,27 +72,88 @@ end
 
 local function loadSettings()
     local success, result = pcall(function()
-        local path = getSavePath()            -- >>> CHANGED
-        if isfile and isfile(path) then
-            return HttpService:JSONDecode(readfile(path))
+        local filePath = getPlayerDataPath()
+        if isfile(filePath) then
+            return HttpService:JSONDecode(readfile(filePath))
         end
         return {}
     end)
     if success and result then
-        API.savedSettings     = result.settings or {}
+        API.savedSettings = result.settings or {}
         API.savedModuleStates = result.moduleStates or {}
-        API.savedKeybinds     = result.keybinds or {} -- >>> CHANGED
     else
         warn("Failed to load settings:", result)
-        API.savedSettings, API.savedModuleStates, API.savedKeybinds = {}, {}, {} -- >>> CHANGED
+        API.savedSettings = {}
+        API.savedModuleStates = {}
     end
 end
 
 loadSettings()
 
--- =======================
--- Notifications
--- =======================
+-- Система для сохранения оригинальных значений прозрачности
+local originalTransparencies = {}
+
+local function saveOriginalTransparency(object, property)
+    local key = tostring(object) .. "_" .. property
+    if not originalTransparencies[key] then
+        originalTransparencies[key] = object[property]
+    end
+end
+
+local function restoreOriginalTransparency(object, property)
+    local key = tostring(object) .. "_" .. property
+    if originalTransparencies[key] then
+        object[property] = originalTransparencies[key]
+    end
+end
+
+-- Функция для анимации скрытия/показа GUI элементов
+local function animateGuiElements(frame, show, duration)
+    duration = duration or 0.3
+    
+    local function processElement(element)
+        if element:IsA("Frame") or element:IsA("ScrollingFrame") then
+            if element.BackgroundTransparency < 1 then
+                saveOriginalTransparency(element, "BackgroundTransparency")
+                local targetTransparency = show and originalTransparencies[tostring(element) .. "_BackgroundTransparency"] or 1
+                TweenService:Create(element, TweenInfo.new(duration), {BackgroundTransparency = targetTransparency}):Play()
+            end
+        elseif element:IsA("TextLabel") or element:IsA("TextButton") or element:IsA("TextBox") then
+            if element.TextTransparency < 1 or show then
+                saveOriginalTransparency(element, "TextTransparency")
+                local targetTransparency = show and originalTransparencies[tostring(element) .. "_TextTransparency"] or 1
+                TweenService:Create(element, TweenInfo.new(duration), {TextTransparency = targetTransparency}):Play()
+            end
+            if element.BackgroundTransparency < 1 or show then
+                saveOriginalTransparency(element, "BackgroundTransparency")
+                local targetTransparency = show and originalTransparencies[tostring(element) .. "_BackgroundTransparency"] or 1
+                TweenService:Create(element, TweenInfo.new(duration), {BackgroundTransparency = targetTransparency}):Play()
+            end
+        elseif element:IsA("ImageLabel") or element:IsA("ImageButton") then
+            if element.ImageTransparency < 1 or show then
+                saveOriginalTransparency(element, "ImageTransparency")
+                local targetTransparency = show and originalTransparencies[tostring(element) .. "_ImageTransparency"] or 1
+                TweenService:Create(element, TweenInfo.new(duration), {ImageTransparency = targetTransparency}):Play()
+            end
+            if element.BackgroundTransparency < 1 or show then
+                saveOriginalTransparency(element, "BackgroundTransparency")
+                local targetTransparency = show and originalTransparencies[tostring(element) .. "_BackgroundTransparency"] or 1
+                TweenService:Create(element, TweenInfo.new(duration), {BackgroundTransparency = targetTransparency}):Play()
+            end
+        end
+        
+        -- Рекурсивно обрабатываем дочерние элементы
+        for _, child in pairs(element:GetChildren()) do
+            if child:IsA("GuiObject") then
+                processElement(child)
+            end
+        end
+    end
+    
+    processElement(frame)
+end
+
+-- Система уведомлений
 local notificationsGui = Instance.new("ScreenGui")
 notificationsGui.Name = "UmbrellaNotifications"
 notificationsGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -155,9 +200,11 @@ local function showNotification(text, color, duration)
     
     notification.Parent = notificationsFrame
     
+    -- Анимация появления
     local tweenIn = TweenService:Create(notification, TweenInfo.new(0.3), {BackgroundTransparency = 0})
     tweenIn:Play()
     
+    -- Автоматическое скрытие
     task.delay(duration or 3, function()
         local tweenOut = TweenService:Create(notification, TweenInfo.new(0.3), {BackgroundTransparency = 1})
         tweenOut:Play()
@@ -167,9 +214,7 @@ local function showNotification(text, color, duration)
     end)
 end
 
--- =======================
--- Key System (kept)
--- =======================
+-- Создание ключ системы
 local function createKeySystem()
     local gui = Instance.new("ScreenGui")
     gui.Name = "PremiumLoader"
@@ -255,6 +300,7 @@ local function createKeySystem()
     local btnGetKey = createButton("Get key", 0.1)
     local btnConfirm = createButton("Confirm", 0.55)
 
+    -- Анимация иконки
     local currentTween = nil
     local isAnimating = false
 
@@ -262,9 +308,14 @@ local function createKeySystem()
         if currentTween then
             currentTween:Cancel()
         end
+        
         local rot = direction == "left" and 360 or -360
-        currentTween = TweenService:Create(icon, TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {Rotation = rot})
+        currentTween = TweenService:Create(icon, 
+            TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), 
+            {Rotation = rot}
+        )
         currentTween:Play()
+        
         if callback then
             currentTween.Completed:Connect(callback)
         end
@@ -273,11 +324,14 @@ local function createKeySystem()
     local function startIconLoop()
         if isAnimating then return end
         isAnimating = true
+        
         coroutine.wrap(function()
             while isAnimating do
                 spinIcon("left")
                 task.wait(2)
+                
                 if not isAnimating then break end
+                
                 spinIcon("right") 
                 task.wait(2)
             end
@@ -286,9 +340,12 @@ local function createKeySystem()
 
     local function stopIconLoop()
         isAnimating = false
-        if currentTween then currentTween:Cancel() end
+        if currentTween then
+            currentTween:Cancel()
+        end
     end
 
+    -- Главная анимация загрузки
     coroutine.wrap(function()
         local fillTween = TweenService:Create(progressFill, TweenInfo.new(2, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 1, 0)})
         fillTween:Play()
@@ -301,14 +358,16 @@ local function createKeySystem()
                 
                 local hideProgress = TweenService:Create(progressBar, TweenInfo.new(0.3), {BackgroundTransparency = 1})
                 local hideFill = TweenService:Create(progressFill, TweenInfo.new(0.3), {BackgroundTransparency = 1})
-                hideProgress:Play(); hideFill:Play(); hideProgress.Completed:Wait()
+                hideProgress:Play()
+                hideFill:Play()
+                hideProgress.Completed:Wait()
                 
                 keyInput.Visible = true
                 btnGetKey.Visible = true
                 btnConfirm.Visible = true
                 
-                TweenService:Create(keyInput,  TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
-                TweenService:Create(btnGetKey,  TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
+                TweenService:Create(keyInput, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
+                TweenService:Create(btnGetKey, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
                 TweenService:Create(btnConfirm, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
                 
                 task.wait(0.5)
@@ -317,12 +376,15 @@ local function createKeySystem()
         end)
     end)()
 
+    -- Обработчики кнопок
     btnGetKey.MouseEnter:Connect(function() 
-        TweenService:Create(btnGetKey, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(45,45,47)}):Play()
+        TweenService:Create(btnGetKey, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(45, 45, 47)}):Play()
     end)
+
     btnGetKey.MouseLeave:Connect(function() 
         TweenService:Create(btnGetKey, TweenInfo.new(0.2), {BackgroundColor3 = ELEMENT_COLOR}):Play()
     end)
+
     btnGetKey.MouseButton1Click:Connect(function()
         setclipboard("https://discord.gg/hjXQM4X3vq")
         showNotification("Discord link copied to clipboard!", Color3.fromRGB(100, 255, 100))
@@ -331,14 +393,18 @@ local function createKeySystem()
     btnConfirm.MouseEnter:Connect(function() 
         TweenService:Create(btnConfirm, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 90, 90)}):Play()
     end)
+
     btnConfirm.MouseLeave:Connect(function() 
         TweenService:Create(btnConfirm, TweenInfo.new(0.2), {BackgroundColor3 = ACCENT_COLOR}):Play()
     end)
+
     btnConfirm.MouseButton1Click:Connect(function()
         if keyInput.Text == "UmbrellaHub2025" then
             showNotification("Access granted! Loading...", Color3.fromRGB(100, 255, 100))
+            
             task.wait(1)
             TweenService:Create(mainFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
+            
             for _, child in pairs(mainFrame:GetChildren()) do
                 if child:IsA("GuiObject") then
                     TweenService:Create(child, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
@@ -349,13 +415,20 @@ local function createKeySystem()
                     end
                 end
             end
+            
             task.wait(0.5)
             stopIconLoop()
             mainFrame:Destroy()
+            
             task.wait(2.5)
-            if gui and gui.Parent then gui:Destroy() end
+            if gui and gui.Parent then
+                gui:Destroy()
+            end
+            
+            -- Устанавливаем флаг что ключ пройден и запускаем основной UI
             _G.keySystemPassed = true
             createMainUI()
+            
         else
             showNotification("Invalid key! Try again.", ACCENT_COLOR)
             keyInput.Text = ""
@@ -363,82 +436,41 @@ local function createKeySystem()
     end)
 
     gui.AncestryChanged:Connect(function()
-        if not gui.Parent then stopIconLoop() end
-    end)
-end
-
--- =======================
--- Registering modules/settings
--- =======================
-
--- >>> CHANGED: helper to apply module state + callbacks + optional UI refresh
-local function applyModuleState(moduleName, enabled, fromBind)
-    API.savedModuleStates[moduleName] = enabled
-    saveSettings()
-
-    -- propagate to actual module object
-    for category, modules in pairs(API.modules) do
-        for _, module in ipairs(modules) do
-            if module.name == moduleName then
-                module.enabled = enabled
-                if module.callback then
-                    pcall(module.callback, enabled)
-                end
-                -- callbacks map (optional)
-                local cbs = API.callbacks[moduleName]
-                if cbs then
-                    if enabled and cbs.onEnable then pcall(cbs.onEnable) end
-                    if (not enabled) and cbs.onDisable then pcall(cbs.onDisable) end
-                end
-            end
+        if not gui.Parent then
+            stopIconLoop()
         end
-    end
-
-    local msg = ("%s: %s"):format(moduleName, enabled and "Enabled" or "Disabled")
-    if fromBind then
-        showNotification(msg, enabled and Color3.fromRGB(100,255,100) or ACCENT_COLOR, 2.5)
-    end
-end
-
--- >>> CHANGED: single place to save keybind
-local function saveModuleBind(moduleName, keyName)
-    API.savedKeybinds[moduleName] = keyName
-    saveSettings()
+    end)
 end
 
 function API:registerModule(category, moduleData)
     self.modules[category] = self.modules[category] or {}
-
-    -- >>> CHANGED: autorun setting table if absent, inject Enabled toggle WITH integrated bind
+    
+    -- Автоматически создаем настройку тоггла для каждого модуля
     if not self.settings[moduleData.name] then
-        local defaultEnabled = moduleData.enabled or false
-        local defaultBind = (API.savedKeybinds[moduleData.name]) or "None"
-
         self.settings[moduleData.name] = {
             settings = {
                 {
                     name = "Enabled",
                     type = "toggle",
-                    default = defaultEnabled,
-                    hasBind = true,         -- <<< flag for integrated bind UI
-                    bindName = "Bind",      -- label inside pill
-                    defaultBind = defaultBind,
+                    default = moduleData.enabled or false,
                     callback = function(value)
-                        applyModuleState(moduleData.name, value, false)
-                    end,
-                    onBindChanged = function(keyName)
-                        saveModuleBind(moduleData.name, keyName)
+                        moduleData.enabled = value
+                        saveModuleState(moduleData.name, value)
+                        if moduleData.callback then
+                            pcall(moduleData.callback, value)
+                        end
                     end
                 }
             }
         }
     end
-
+    
     table.insert(self.modules[category], moduleData)
-
-    -- load saved state (if exists) and auto-apply
+    
+    -- Загружаем сохраненное состояние
     if self.savedModuleStates[moduleData.name] ~= nil then
         moduleData.enabled = self.savedModuleStates[moduleData.name]
+        -- Автоматически применяем состояние при загрузке
         if moduleData.enabled and moduleData.callback then
             pcall(moduleData.callback, true)
         end
@@ -447,6 +479,7 @@ end
 
 function API:registerSettings(moduleName, settingsTable)
     self.settings[moduleName] = {settings = settingsTable}
+    
     if API.savedSettings[moduleName] then
         for _, setting in ipairs(settingsTable) do
             if API.savedSettings[moduleName][setting.name] ~= nil then
@@ -468,25 +501,34 @@ local moduleSystem = {
 
 local moduleSettings = API.settings
 
--- =======================
--- Tween helpers
--- =======================
 local function tweenColor(object, property, targetColor, duration)
-    local tweenInfo = TweenInfo.new(duration or 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local tweenInfo = TweenInfo.new(
+        duration or 0.2,
+        Enum.EasingStyle.Quad,
+        Enum.EasingDirection.Out
+    )
     local tween = TweenService:Create(object, tweenInfo, {[property] = targetColor})
     tween:Play()
     return tween
 end
 
 local function tweenTransparency(object, property, targetValue, duration)
-    local tweenInfo = TweenInfo.new(duration or 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local tweenInfo = TweenInfo.new(
+        duration or 0.2,
+        Enum.EasingStyle.Quad,
+        Enum.EasingDirection.Out
+    )
     local tween = TweenService:Create(object, tweenInfo, {[property] = targetValue})
     tween:Play()
     return tween
 end
 
 local function tweenSize(object, property, targetSize, duration)
-    local tweenInfo = TweenInfo.new(duration or 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local tweenInfo = TweenInfo.new(
+        duration or 0.2,
+        Enum.EasingStyle.Quad,
+        Enum.EasingDirection.Out
+    )
     local tween = TweenService:Create(object, tweenInfo, {[property] = targetSize})
     tween:Play()
     return tween
@@ -547,19 +589,20 @@ local function createScrollableContainer(parent, size, position, padding)
     
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
-        local visibleRatio = scrollFrame.AbsoluteWindowSize.Y / math.max(1, scrollFrame.CanvasSize.Y.Offset)
+        
+        local visibleRatio = scrollFrame.AbsoluteWindowSize.Y / scrollFrame.CanvasSize.Y
         scrollBarFill.Size = UDim2.new(1, 0, visibleRatio, 0)
     end)
     
     scrollFrame:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
-        local denom = (scrollFrame.CanvasSize.Y.Offset - scrollFrame.AbsoluteWindowSize.Y)
-        local positionRatio = denom > 0 and (scrollFrame.CanvasPosition.Y / denom) or 0
+        local positionRatio = scrollFrame.CanvasPosition.Y / (scrollFrame.CanvasSize.Y - scrollFrame.AbsoluteWindowSize.Y)
         scrollBarFill.Position = UDim2.new(0, 0, positionRatio * (1 - scrollBarFill.Size.Y.Scale), 0)
     end)
     
     scrollFrame.MouseEnter:Connect(function()
         tweenTransparency(scrollBar, "Transparency", 0.5)
     end)
+    
     scrollFrame.MouseLeave:Connect(function()
         tweenTransparency(scrollBar, "Transparency", 1)
     end)
@@ -567,10 +610,7 @@ local function createScrollableContainer(parent, size, position, padding)
     return scrollFrame, container
 end
 
--- =======================
--- Setting elements
--- =======================
-
+-- Создание элементов настроек (dropdown, textfield, slider, toggle)
 local function createDropDown(parent, setting, position)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0, 280, 0, 50)
@@ -636,11 +676,15 @@ local function createDropDown(parent, setting, position)
     menuLayout.Parent = dropDownMenu
 
     local isOpen = false
+    local selectedValue = setting.default
 
     local function updateMenu()
         for _, child in ipairs(dropDownMenu:GetChildren()) do
-            if child:IsA("TextButton") then child:Destroy() end
+            if child:IsA("TextButton") then
+                child:Destroy()
+            end
         end
+
         for _, option in ipairs(setting.options) do
             local optionButton = Instance.new("TextButton")
             optionButton.Size = UDim2.new(1, -10, 0, 30)
@@ -658,11 +702,19 @@ local function createDropDown(parent, setting, position)
             corner.Parent = optionButton
 
             optionButton.MouseButton1Click:Connect(function()
+                selectedValue = option
                 selectedText.Text = option
-                API.savedSettings[setting.moduleName] = API.savedSettings[setting.moduleName] or {}
+
+                if not API.savedSettings[setting.moduleName] then
+                    API.savedSettings[setting.moduleName] = {}
+                end
                 API.savedSettings[setting.moduleName][setting.name] = option
                 saveSettings()
-                if setting.callback then setting.callback(option) end
+
+                if setting.callback then
+                    setting.callback(option)
+                end
+
                 frame:Close()
             end)
         end
@@ -693,6 +745,7 @@ local function createDropDown(parent, setting, position)
     end
 
     dropDownButton.MouseButton1Click:Connect(toggleMenu)
+
     return frame
 end
 
@@ -739,13 +792,21 @@ local function createTextField(parent, setting, position)
     textBox.Parent = textBoxBackground
 
     local function updateValue()
-        API.savedSettings[setting.moduleName] = API.savedSettings[setting.moduleName] or {}
+        if not API.savedSettings[setting.moduleName] then
+            API.savedSettings[setting.moduleName] = {}
+        end
         API.savedSettings[setting.moduleName][setting.name] = textBox.Text
         saveSettings()
-        if setting.callback then setting.callback(textBox.Text) end
+        
+        if setting.callback then
+            setting.callback(textBox.Text)
+        end
     end
 
-    textBox.FocusLost:Connect(function() updateValue() end)
+    textBox.FocusLost:Connect(function()
+        updateValue()
+    end)
+
     return frame
 end
 
@@ -787,7 +848,7 @@ local function createSlider(parent, setting, position)
 
     local sliderActive = Instance.new("Frame")
     sliderActive.Size = UDim2.new((setting.default - setting.min) / (setting.max - setting.min), 0, 1, 0)
-    sliderActive.BackgroundColor3 = ACCENT_COLOR
+    sliderActive.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
     sliderActive.BorderSizePixel = 0
     sliderActive.Parent = sliderBackground
 
@@ -823,12 +884,17 @@ local function createSlider(parent, setting, position)
         debounceTime = currentTime
         task.delay(0.5, function()
             if debounceTime == currentTime then
-                API.savedSettings[setting.moduleName] = API.savedSettings[setting.moduleName] or {}
+                if not API.savedSettings[setting.moduleName] then
+                    API.savedSettings[setting.moduleName] = {}
+                end
                 API.savedSettings[setting.moduleName][setting.name] = value
                 saveSettings()
             end
         end)
-        if setting.callback then setting.callback(value) end
+        
+        if setting.callback then
+            setting.callback(value)
+        end
     end
 
     sliderCircle.InputBegan:Connect(function(input)
@@ -837,18 +903,21 @@ local function createSlider(parent, setting, position)
             sliderCircle:TweenSize(UDim2.new(0, 15, 0, 15), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
         end
     end)
+
     sliderCircle.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = false
             sliderCircle:TweenSize(UDim2.new(0, 12, 0, 12), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
         end
     end)
+
     game:GetService("UserInputService").InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local mousePos = input.Position.X
             local sliderStart = sliderBackground.AbsolutePosition.X
             local sliderEnd = sliderStart + sliderBackground.AbsoluteSize.X
             local newX = math.clamp(mousePos, sliderStart, sliderEnd)
+
             local relativePos = (newX - sliderStart) / sliderBackground.AbsoluteSize.X
             local newValue = math.floor(relativePos * (setting.max - setting.min) + setting.min)
             updateSlider(newValue)
@@ -859,7 +928,6 @@ local function createSlider(parent, setting, position)
     return frame
 end
 
--- >>> CHANGED: Toggle with integrated bind pill (only when setting.hasBind == true)
 local function createToggle(parent, setting, position)
     local outerFrame = Instance.new("Frame")
     outerFrame.Size = UDim2.new(0, 280, 0, 50)
@@ -901,137 +969,69 @@ local function createToggle(parent, setting, position)
     circleCorner.CornerRadius = UDim.new(1, 0)
     circleCorner.Parent = switchCircle
 
-    local isEnabled = setting.default == true
-
-    local function paintState()
-        if isEnabled then
-            switchCircle.Position = UDim2.new(1, -19, 0, 1)
-            switchCircle.BackgroundColor3 = ACCENT_COLOR
-        else
-            switchCircle.Position = UDim2.new(0, 1, 0, 1)
-            switchCircle.BackgroundColor3 = Color3.fromRGB(142, 142, 142)
-        end
-    end
-    paintState()
-
-    local function commitEnabled(newValue, fromUi)
-        isEnabled = newValue
-        paintState()
-        API.savedSettings[setting.moduleName] = API.savedSettings[setting.moduleName] or {}
-        API.savedSettings[setting.moduleName][setting.name] = isEnabled
-        saveSettings()
-        if setting.callback then setting.callback(isEnabled) end
-        -- >>> CHANGED: keep module state as single source of truth
-        applyModuleState(setting.moduleName, isEnabled, false)
+    local isEnabled = setting.default
+    if isEnabled then
+        switchCircle.Position = UDim2.new(1, -19, 0, 1)
+        switchCircle.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
     end
 
     switchTrack.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            commitEnabled(not isEnabled, true)
-        end
-    end)
-
-    -- >>> CHANGED: Integrated bind pill (only if hasBind)
-    if setting.hasBind then
-        local pill = Instance.new("TextButton")
-        pill.AutoButtonColor = false
-        pill.Size = UDim2.new(0, 90, 0, 22)
-        pill.Position = UDim2.new(1, 10, 0.5, -11)
-        pill.BackgroundColor3 = Color3.fromRGB(20,20,22)
-        pill.BorderSizePixel = 0
-        pill.Text = ""
-        pill.Parent = outerFrame
-
-        local pillCorner = Instance.new("UICorner")
-        pillCorner.CornerRadius = UDim.new(1, 0)
-        pillCorner.Parent = pill
-
-        local pillLabel = Instance.new("TextLabel")
-        pillLabel.Size = UDim2.new(1, -12, 1, 0)
-        pillLabel.Position = UDim2.new(0, 6, 0, 0)
-        pillLabel.BackgroundTransparency = 1
-        local initialKey = setting.defaultBind or "None"
-        pillLabel.Text = (setting.bindName or "Bind") .. ": " .. initialKey
-        pillLabel.TextColor3 = TEXT_COLOR
-        pillLabel.Font = Enum.Font.SourceSans
-        pillLabel.TextSize = 18
-        pillLabel.TextXAlignment = Enum.TextXAlignment.Left
-        pillLabel.Parent = pill
-
-        local listening = false
-        local function setKeyName(name)
-            pillLabel.Text = (setting.bindName or "Bind") .. ": " .. name
-            API.savedKeybinds[setting.moduleName] = name
+            isEnabled = not isEnabled
+            if isEnabled then
+                switchCircle:TweenPosition(UDim2.new(1, -19, 0, 1), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
+                switchCircle.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
+            else
+                switchCircle:TweenPosition(UDim2.new(0, 1, 0, 1), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
+                switchCircle.BackgroundColor3 = Color3.fromRGB(142, 142, 142)
+            end
+            
+            if not API.savedSettings[setting.moduleName] then
+                API.savedSettings[setting.moduleName] = {}
+            end
+            API.savedSettings[setting.moduleName][setting.name] = isEnabled
             saveSettings()
-            if setting.onBindChanged then
-                pcall(setting.onBindChanged, name)
+            
+            if setting.callback then
+                setting.callback(isEnabled)
             end
         end
-
-        pill.MouseButton1Click:Connect(function()
-            if listening then return end
-            listening = true
-            pillLabel.Text = (setting.bindName or "Bind") .. ": ..."
-            local conn; conn = UIS.InputBegan:Connect(function(input, gp)
-                if gp then return end
-                -- ignore text boxes to avoid stealing typing
-                if UIS:GetFocusedTextBox() then return end
-
-                local key = input.KeyCode
-                -- Mouse buttons or Unknown -> ignore, except Backspace to clear
-                if key == Enum.KeyCode.Unknown then return end
-
-                if key == Enum.KeyCode.Backspace then
-                    setKeyName("None")
-                else
-                    setKeyName(key.Name)
-                end
-                if conn then conn:Disconnect() end
-                listening = false
-            end)
-        end)
-    end
+    end)
 
     return outerFrame
 end
 
-function API:saveSettings() saveSettings() end
+function API:saveSettings()
+    saveSettings()
+end
 
 function API:loadSettings()
     loadSettings()
-    -- apply saved module states
+    
+    -- Применяем сохраненные состояния модулей при загрузке
     for moduleName, enabled in pairs(self.savedModuleStates) do
         for category, modules in pairs(self.modules) do
             for _, module in ipairs(modules) do
                 if module.name == moduleName then
                     module.enabled = enabled
-                    if enabled and module.callback then pcall(module.callback, true) end
+                    -- Автоматически включаем модуль если он был включен
+                    if enabled and module.callback then
+                        pcall(module.callback, true)
+                    end
                     break
                 end
             end
         end
     end
-    -- load other settings
+    
+    -- Загружаем остальные настройки
     for moduleName, settings in pairs(self.settings) do
         if self.savedSettings[moduleName] then
             for _, setting in ipairs(settings.settings) do
-                local saved = self.savedSettings[moduleName][setting.name]
-                if saved ~= nil then
-                    setting.default = saved
-                    if setting.callback then pcall(setting.callback, saved) end
-                end
-                -- >>> CHANGED: propagate saved bind to pill label where applicable
-                if setting.hasBind then
-                    setting.defaultBind = API.savedKeybinds[moduleName] or setting.defaultBind or "None"
-                end
-            end
-        else
-            -- still propagate saved bind from keybinds even if no other settings saved
-            local cfg = self.settings[moduleName]
-            if cfg and cfg.settings then
-                for _, st in ipairs(cfg.settings) do
-                    if st.hasBind then
-                        st.defaultBind = API.savedKeybinds[moduleName] or st.defaultBind or "None"
+                if self.savedSettings[moduleName][setting.name] ~= nil then
+                    setting.default = self.savedSettings[moduleName][setting.name]
+                    if setting.callback then
+                        pcall(setting.callback, setting.default)
                     end
                 end
             end
@@ -1039,14 +1039,24 @@ function API:loadSettings()
     end
 end
 
--- >>> CHANGED: single function used everywhere to flip module (so visuals stay consistent)
 local function saveModuleState(moduleName, enabled)
-    applyModuleState(moduleName, enabled, false)
+    API.savedModuleStates[moduleName] = enabled
+    saveSettings()
+    
+    -- Немедленно применяем изменение состояния
+    for category, modules in pairs(API.modules) do
+        for _, module in ipairs(modules) do
+            if module.name == moduleName then
+                module.enabled = enabled
+                if module.callback then
+                    pcall(module.callback, enabled)
+                end
+                break
+            end
+        end
+    end
 end
 
--- =======================
--- Settings rendering
--- =======================
 local function showModuleSettings(moduleName)
     clearSettingsContainer()
     API:loadSettings()
@@ -1072,27 +1082,23 @@ local function showModuleSettings(moduleName)
     local yOffset = 0
     for _, setting in ipairs(settings.settings) do
         setting.moduleName = moduleName
+        
         if setting.type == "slider" then
-            createSlider(container, setting, UDim2.new(0, 0, 0, yOffset))
+            local slider = createSlider(container, setting, UDim2.new(0, 0, 0, yOffset))
             yOffset = yOffset + 15
         elseif setting.type == "toggle" then
-            createToggle(container, setting, UDim2.new(0, 0, 0, yOffset))
+            local toggle = createToggle(container, setting, UDim2.new(0, 0, 0, yOffset))
             yOffset = yOffset + 5
         elseif setting.type == "textfield" then
-            createTextField(container, setting, UDim2.new(0, 0, 0, yOffset))
+            local textField = createTextField(container, setting, UDim2.new(0, 0, 0, yOffset))
             yOffset = yOffset + 5
         elseif setting.type == "dropdown" then
-            createDropDown(container, setting, UDim2.new(0, 0, 0, yOffset))
+            local dropDown = createDropDown(container, setting, UDim2.new(0, 0, 0, yOffset))
             yOffset = yOffset + 5
         end
     end
 end
 
--- =======================
--- Module list
--- =======================
-
--- >>> CHANGED: do NOT toggle module on click; only select & show settings.
 local function createModuleButton(parent, moduleData)
     local moduleButton = Instance.new("Frame")
     moduleButton.Size = UDim2.new(1, -20, 0, 40)
@@ -1109,7 +1115,7 @@ local function createModuleButton(parent, moduleData)
     activeLine.Size = UDim2.new(0, 2, 0, 0)
     activeLine.Position = UDim2.new(0, 0, 0.5, 0)
     activeLine.AnchorPoint = Vector2.new(0, 0.5)
-    activeLine.BackgroundColor3 = ACCENT_COLOR
+    activeLine.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
     activeLine.BorderSizePixel = 0
     activeLine.Transparency = 1
     activeLine.Parent = moduleButton
@@ -1141,39 +1147,39 @@ local function createModuleButton(parent, moduleData)
     clickDetector.ZIndex = 10
     clickDetector.Parent = moduleButton
 
-    local function paintSelected(selected)
-        if selected then
-            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
-            tweenColor(moduleName, "TextColor3", ACCENT_COLOR)
-            activeLine.Transparency = 0
-            tweenSize(activeLine, "Size", UDim2.new(0, 2, 1, -20))
-        else
-            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
-            tweenColor(moduleName, "TextColor3", Color3.fromRGB(150, 153, 163))
-            tweenTransparency(activeLine, "Transparency", 1)
-            tweenSize(activeLine, "Size", UDim2.new(0, 2, 0, 0))
-        end
+    local debounce = false
+
+    if moduleData.enabled then
+        moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
+        moduleName.TextColor3 = Color3.fromRGB(255, 75, 75)
+        activeLine.Size = UDim2.new(0, 2, 1, -20)
+        activeLine.Transparency = 0
     end
 
     clickDetector.MouseEnter:Connect(function()
-        if moduleSystem.activeModuleName ~= moduleData.name then
+        if not moduleData.enabled then
             tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(20, 20, 22), 0.15)
             tweenColor(moduleName, "TextColor3", Color3.fromRGB(180, 183, 193), 0.15)
         end
     end)
+
     clickDetector.MouseLeave:Connect(function()
-        if moduleSystem.activeModuleName ~= moduleData.name then
+        if not moduleData.enabled then
             tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17), 0.15)
             tweenColor(moduleName, "TextColor3", Color3.fromRGB(150, 153, 163), 0.15)
         end
     end)
 
     clickDetector.MouseButton1Click:Connect(function()
-        -- deselect others
+        if debounce then return end
+        debounce = true
+
         for _, otherButton in pairs(parent:GetChildren()) do
             if otherButton:IsA("Frame") and otherButton ~= moduleButton then
                 local otherLine = otherButton:FindFirstChild("Frame")
                 local otherText = otherButton:FindFirstChild("TextLabel")
+                local otherIndex = otherButton:GetAttribute("ModuleIndex")
+
                 if otherLine then 
                     tweenTransparency(otherLine, "Transparency", 1)
                     tweenSize(otherLine, "Size", UDim2.new(0, 2, 0, 0))
@@ -1182,29 +1188,83 @@ local function createModuleButton(parent, moduleData)
                     tweenColor(otherText, "TextColor3", Color3.fromRGB(150, 153, 163)) 
                 end
                 tweenColor(otherButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
+
+                if otherIndex then
+                    if API.modules[moduleSystem.activeCategory] then
+                        local otherModule = API.modules[moduleSystem.activeCategory][otherIndex]
+                        if otherModule and otherModule.enabled then
+                            otherModule.enabled = false
+                            saveModuleState(otherModule.name, false)
+                            if API.callbacks[otherModule.name] and API.callbacks[otherModule.name].onDisable then
+                                pcall(API.callbacks[otherModule.name].onDisable)
+                            end
+                        end
+                    else
+                        local otherModule = moduleSystem.modules[moduleSystem.activeCategory][otherIndex]
+                        if otherModule and otherModule.enabled then
+                            otherModule.enabled = false
+                            saveModuleState(otherModule.name, false)
+                        end
+                    end
+                end
             end
         end
 
-        -- select this one (no state toggle)
-        moduleSystem.activeModuleName = moduleData.name
-        slashLabel.Visible = true
-        moduleNameLabel.Text = moduleData.name
-        tweenColor(moduleNameLabel, "TextColor3", ACCENT_COLOR)
-        paintSelected(true)
-        showModuleSettings(moduleData.name)
-    end)
+        moduleData.enabled = not moduleData.enabled
+        saveModuleState(moduleData.name, moduleData.enabled)
 
-    -- keep visual "enabled highlight" for already-enabled module when list renders
-    if moduleData.name == moduleSystem.activeModuleName then
-        paintSelected(true)
-    end
+        if moduleData.enabled then
+            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
+            tweenColor(moduleName, "TextColor3", Color3.fromRGB(255, 75, 75))
+
+            activeLine.Transparency = 0
+            tweenSize(activeLine, "Size", UDim2.new(0, 2, 1, -20))
+
+            task.delay(0.1, function()
+                slashLabel.Visible = true
+                moduleNameLabel.Text = moduleData.name
+                tweenColor(moduleNameLabel, "TextColor3", Color3.fromRGB(255, 75, 75))
+                moduleSystem.activeModuleName = moduleData.name
+                showModuleSettings(moduleData.name)
+            end)
+
+            if API.callbacks[moduleData.name] and API.callbacks[moduleData.name].onEnable then
+                pcall(API.callbacks[moduleData.name].onEnable)
+            end
+        else
+            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
+            tweenColor(moduleName, "TextColor3", Color3.fromRGB(150, 153, 163))
+
+            tweenTransparency(activeLine, "Transparency", 1)
+            tweenSize(activeLine, "Size", UDim2.new(0, 2, 0, 0))
+
+            task.delay(0.2, function()
+                slashLabel.Visible = false
+                moduleNameLabel.Text = ""
+                moduleSystem.activeModuleName = nil
+                clearSettingsContainer()
+            end)
+
+            if API.callbacks[moduleData.name] and API.callbacks[moduleData.name].onDisable then
+                pcall(API.callbacks[moduleData.name].onDisable)
+            end
+        end
+
+        if moduleData.callback then
+            pcall(moduleData.callback, moduleData.enabled)
+        end
+
+        debounce = false
+    end)
 
     return moduleButton
 end
 
 local function updateModuleList(moduleFrame, categoryName)
     for _, child in pairs(moduleFrame:GetChildren()) do
-        if not child:IsA("UIListLayout") then child:Destroy() end
+        if not child:IsA("UIListLayout") then
+            child:Destroy()
+        end
     end
 
     local categoryModules = API.modules[categoryName] or moduleSystem.modules[categoryName]
@@ -1213,33 +1273,69 @@ local function updateModuleList(moduleFrame, categoryName)
             local moduleButton = createModuleButton(moduleFrame, moduleData)
             moduleButton:SetAttribute("ModuleIndex", index)
             moduleButton.Parent = moduleFrame
+
+            if moduleData.enabled then
+                local activeLine = moduleButton:FindFirstChild("Frame")
+                local moduleName = moduleButton:FindFirstChild("TextLabel")
+
+                moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
+                if activeLine then 
+                    activeLine.Transparency = 0
+                    activeLine.Size = UDim2.new(0, 2, 1, -20)
+                end
+                if moduleName then moduleName.TextColor3 = Color3.fromRGB(255, 75, 75) end
+
+                slashLabel.Visible = true
+                moduleNameLabel.Text = moduleData.name
+                moduleNameLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
+                moduleSystem.activeModuleName = moduleData.name
+                showModuleSettings(moduleData.name)
+                
+                if API.callbacks[moduleData.name] and API.callbacks[moduleData.name].onEnable then
+                    pcall(API.callbacks[moduleData.name].onEnable)
+                end
+            end
         end
     end
 end
 
--- =======================
--- GUI toggle
--- =======================
+-- Улучшенная функция для переключения видимости GUI
 local function toggleGUI()
     if not _G.keySystemPassed or not _G.mainFrame then return end
+    
     _G.isGUIVisible = not _G.isGUIVisible
+    
     if _G.isGUIVisible then
         _G.mainFrame.Visible = true
+        
+        -- Анимация размера и позиции
         TweenService:Create(_G.mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
             Size = UDim2.new(0, 900, 0, 600),
             Position = UDim2.new(0.5, -450, 0.5, -300)
         }):Play()
+        
+        -- Анимация появления элементов
+        task.wait(0.1)
+        animateGuiElements(_G.mainFrame, true, 0.25)
+        
     else
+        -- Анимация исчезновения элементов
+        animateGuiElements(_G.mainFrame, false, 0.2)
+        
+        -- Анимация размера и позиции
+        task.wait(0.1)
         TweenService:Create(_G.mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
             Size = UDim2.new(0, 0, 0, 0),
             Position = UDim2.new(0.5, 0, 0.5, 0)
         }):Play()
+        
         task.wait(0.3)
         _G.mainFrame.Visible = false
         showNotification("Press Left Alt to open GUI", Color3.fromRGB(100, 255, 100), 2)
     end
 end
 
+-- Создание улучшенной иконки-кнопки для открытия GUI
 local function createToggleButton()
     if not _G.keySystemPassed then return end
     
@@ -1261,52 +1357,76 @@ local function createToggleButton()
     corner.CornerRadius = UDim.new(0, 8)
     corner.Parent = toggleButton
     
+    -- Сохраняем оригинальные значения
+    saveOriginalTransparency(toggleButton, "BackgroundTransparency")
+    saveOriginalTransparency(toggleButton, "ImageTransparency")
+    
+    -- Анимации для кнопки
     toggleButton.MouseEnter:Connect(function()
         TweenService:Create(toggleButton, TweenInfo.new(0.2), {
             Size = UDim2.new(0, 55, 0, 55),
             BackgroundColor3 = Color3.fromRGB(22, 28, 30)
         }):Play()
     end)
+    
     toggleButton.MouseLeave:Connect(function()
         TweenService:Create(toggleButton, TweenInfo.new(0.2), {
             Size = UDim2.new(0, 50, 0, 50),
             BackgroundColor3 = Color3.fromRGB(15, 15, 17)
         }):Play()
     end)
-    toggleButton.MouseButton1Click:Connect(function() toggleGUI() end)
-
-    -- drag
-    local dragging, dragStart, startPos = false, nil, nil
+    
+    toggleButton.MouseButton1Click:Connect(function()
+        -- Анимация клика
+        local originalSize = toggleButton.Size
+        toggleButton:TweenSize(UDim2.new(0, 45, 0, 45), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.1, true, function()
+            toggleButton:TweenSize(originalSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.1, true)
+        end)
+        
+        toggleGUI()
+    end)
+    
+    -- Делаем кнопку перетаскиваемой
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
+    
     toggleButton.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true; dragStart = input.Position; startPos = toggleButton.Position
+            dragging = true
+            dragStart = input.Position
+            startPos = toggleButton.Position
         end
     end)
+    
     toggleButton.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
     end)
+    
     UIS.InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = input.Position - dragStart
             toggleButton.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + delta.X,
-                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
             )
         end
     end)
 end
 
--- open GUI with LeftAlt
+-- Обработка нажатия Left Alt для переключения GUI
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
+    
     if input.KeyCode == Enum.KeyCode.LeftAlt then
         toggleGUI()
     end
 end)
 
--- =======================
--- Main UI (kept)
--- =======================
 function createMainUI()
     local Players = game:GetService("Players")
     local player = Players.LocalPlayer
@@ -1363,6 +1483,7 @@ function createMainUI()
             end)
         end
     end)
+
     UIS.InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             updateDrag(input)
@@ -1439,7 +1560,7 @@ function createMainUI()
     moduleNameLabel.Text = ""
     moduleNameLabel.TextSize = 22
     moduleNameLabel.Font = Enum.Font.Gotham
-    moduleNameLabel.TextColor3 = ACCENT_COLOR
+    moduleNameLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
     moduleNameLabel.TextXAlignment = Enum.TextXAlignment.Left
     moduleNameLabel.Parent = mainFrame
 
@@ -1474,7 +1595,7 @@ function createMainUI()
         redLine.Size = UDim2.new(0, 2, 0, 0)
         redLine.Position = UDim2.new(0, 0, 0.5, 0)
         redLine.AnchorPoint = Vector2.new(0, 0.5)
-        redLine.BackgroundColor3 = ACCENT_COLOR
+        redLine.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
         redLine.Transparency = 1
         redLine.Parent = categoryButton
 
@@ -1489,6 +1610,7 @@ function createMainUI()
                 tweenColor(iconImage, "ImageColor3", Color3.fromRGB(200, 200, 200), 0.15)
             end
         end)
+
         clickDetector.MouseLeave:Connect(function()
             if activeCategory ~= categoryButton then
                 tweenColor(iconImage, "ImageColor3", Color3.fromRGB(150, 150, 150), 0.15)
@@ -1501,7 +1623,10 @@ function createMainUI()
             if activeCategory then
                 local prevIcon = activeCategory:FindFirstChild("ImageLabel")
                 local prevLine = activeCategory:FindFirstChild("Frame")
-                if prevIcon then tweenColor(prevIcon, "ImageColor3", Color3.fromRGB(150, 150, 150)) end
+
+                if prevIcon then
+                    tweenColor(prevIcon, "ImageColor3", Color3.fromRGB(150, 150, 150))
+                end
                 if prevLine then
                     tweenTransparency(prevLine, "Transparency", 1)
                     tweenSize(prevLine, "Size", UDim2.new(0, 2, 0, 0))
@@ -1513,13 +1638,15 @@ function createMainUI()
             moduleSystem.activeCategory = name
 
             tweenColor(categoryButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
-            tweenColor(iconImage, "ImageColor3", ACCENT_COLOR)
+            tweenColor(iconImage, "ImageColor3", Color3.fromRGB(255, 75, 75))
+
             redLine.Transparency = 0
             tweenSize(redLine, "Size", UDim2.new(0, 2, 0, 20))
 
             activeCategoryLabel.Text = name
             slashLabel.Visible = false
             moduleNameLabel.Text = ""
+            
             clearSettingsContainer()
             updateModuleList(moduleList, name)
         end)
@@ -1546,6 +1673,7 @@ function createMainUI()
     _G.mainFrame = mainFrame
     _G.isGUIVisible = true
     
+    -- Показываем GUI с анимацией
     mainFrame.Visible = true
     TweenService:Create(mainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {
         Size = UDim2.new(0, 900, 0, 600),
@@ -1556,20 +1684,6 @@ function createMainUI()
     task.wait(0.5)
     createToggleButton()
 end
-
--- >>> CHANGED: Global keybind handler
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.UserInputType == Enum.UserInputType.Keyboard then
-        local pressedKey = input.KeyCode.Name
-        for moduleName, keyName in pairs(API.savedKeybinds) do
-            if keyName ~= "None" and keyName == pressedKey then
-                local currentState = API.savedModuleStates[moduleName] or false
-                applyModuleState(moduleName, not currentState, true)
-            end
-        end
-    end
-end)
 
 function API:registerCallback(moduleName, callbacks)
     self.callbacks[moduleName] = callbacks
