@@ -1,422 +1,4 @@
--- Улучшенная функция для переключения видимости GUI
-local function toggleGUI()
-    if not _G.keySystemPassed or not _G.mainFrame then return end
-    
-    _G.isGUIVisible = not _G.isGUIVisible
-    
-    if _G.isGUIVisible then
-        _G.mainFrame.Visible = true
-        
-        -- Анимация размера и позиции
-        TweenService:Create(_G.mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-            Size = UDim2.new(0, 900, 0, 600),
-            Position = UDim2.new(0.5, -450, 0.5, -300)
-        }):Play()
-        
-        -- Анимация появления элементов
-        task.wait(0.1)
-        animateGuiElements(_G.mainFrame, true, 0.25)
-        
-    else
-        -- Анимация исчезновения элементов
-        animateGuiElements(_G.mainFrame, false, 0.2)
-        
-        -- Анимация размера и позиции
-        task.wait(0.1)
-        TweenService:Create(_G.mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-            Size = UDim2.new(0, 0, 0, 0),
-            Position = UDim2.new(0.5, 0, 0.5, 0)
-        }):Play()
-        
-        task.wait(0.3)
-        _G.mainFrame.Visible = false
-        showNotification("Press Left Alt to open GUI", Color3.fromRGB(100, 255, 100), 2)
-    end
-end
-
--- Создание улучшенной иконки-кнопки для открытия GUI
-local function createToggleButton()
-    if not _G.keySystemPassed then return end
-    
-    local toggleGui = Instance.new("ScreenGui")
-    toggleGui.Name = "UmbrellaToggle"
-    toggleGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    toggleGui.Parent = player:WaitForChild("PlayerGui")
-    
-    local toggleButton = Instance.new("ImageButton")
-    toggleButton.Name = "ToggleButton"
-    toggleButton.Size = UDim2.new(0, 50, 0, 50)
-    toggleButton.Position = UDim2.new(0, 20, 0, 20)
-    toggleButton.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-    toggleButton.Image = "http://www.roblox.com/asset/?id=95285379105237"
-    toggleButton.BorderSizePixel = 0
-    toggleButton.Parent = toggleGui
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = toggleButton
-    
-    -- Сохраняем оригинальные значения
-    saveOriginalTransparency(toggleButton, "BackgroundTransparency")
-    saveOriginalTransparency(toggleButton, "ImageTransparency")
-    
-    -- Анимации для кнопки
-    toggleButton.MouseEnter:Connect(function()
-        TweenService:Create(toggleButton, TweenInfo.new(0.2), {
-            Size = UDim2.new(0, 55, 0, 55),
-            BackgroundColor3 = Color3.fromRGB(22, 28, 30)
-        }):Play()
-    end)
-    
-    toggleButton.MouseLeave:Connect(function()
-        TweenService:Create(toggleButton, TweenInfo.new(0.2), {
-            Size = UDim2.new(0, 50, 0, 50),
-            BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-        }):Play()
-    end)
-    
-    toggleButton.MouseButton1Click:Connect(function()
-        -- Анимация клика
-        local originalSize = toggleButton.Size
-        toggleButton:TweenSize(UDim2.new(0, 45, 0, 45), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.1, true, function()
-            toggleButton:TweenSize(originalSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.1, true)
-        end)
-        
-        toggleGUI()
-    end)
-    
-    -- Делаем кнопку перетаскиваемой
-    local dragging = false
-    local dragStart = nil
-    local startPos = nil
-    
-    toggleButton.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = toggleButton.Position
-        end
-    end)
-    
-    toggleButton.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end)
-    
-    UIS.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStart
-            toggleButton.Position = UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
-            )
-        end
-    end)
-end
-
--- Обработка нажатия Left Alt для переключения GUI
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    if input.KeyCode == Enum.KeyCode.LeftAlt then
-        toggleGUI()
-    end
-end)
-
-function createMainUI()
-    local Players = game:GetService("Players")
-    local player = Players.LocalPlayer
-
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "MyUI"
-    screenGui.Parent = player:WaitForChild("PlayerGui")
-
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 0, 0, 0)
-    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
-    mainFrame.BorderSizePixel = 0
-    mainFrame.Visible = false
-    mainFrame.Parent = screenGui
-
-    local mainCorner = Instance.new("UICorner")
-    mainCorner.CornerRadius = UDim.new(0, 8)
-    mainCorner.Parent = mainFrame
-
-    local dragging = false
-    local dragStart
-    local startPos
-
-    local topBar = Instance.new("Frame")
-    topBar.Size = UDim2.new(1, 0, 0, 60)
-    topBar.Position = UDim2.new(0, 0, 0, 0)
-    topBar.BackgroundTransparency = 1
-    topBar.Parent = mainFrame
-
-    local function updateDrag(input)
-        local delta = input.Position - dragStart
-        local position = UDim2.new(
-            startPos.X.Scale,
-            math.floor(startPos.X.Offset + delta.X),
-            startPos.Y.Scale,
-            math.floor(startPos.Y.Offset + delta.Y)
-        )
-        TweenService:Create(mainFrame, TweenInfo.new(0.1), {Position = position}):Play()
-    end
-
-    topBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = mainFrame.Position
-
-            local connection
-            connection = UIS.InputEnded:Connect(function(inputEnd)
-                if inputEnd.UserInputType == Enum.UserInputType.MouseButton1 then
-                    dragging = false
-                    connection:Disconnect()
-                end
-            end)
-        end
-    end)
-
-    UIS.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            updateDrag(input)
-        end
-    end)
-    
-    local categoryFrame = Instance.new("Frame")
-    categoryFrame.Size = UDim2.new(0, 75, 1, -6)
-    categoryFrame.Position = UDim2.new(0, 3, 0, 3)
-    categoryFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-    categoryFrame.BorderSizePixel = 0
-    categoryFrame.Parent = mainFrame
-
-    local categoryList = Instance.new("ScrollingFrame")
-    categoryList.Size = UDim2.new(1, 0, 1, 0)
-    categoryList.Position = UDim2.new(0, 12, 0, 100)
-    categoryList.BackgroundTransparency = 1
-    categoryList.ScrollBarThickness = 0
-    categoryList.CanvasSize = UDim2.new(0, 0, 0, 500)
-    categoryList.Parent = categoryFrame
-
-    local categoryLayout = Instance.new("UIListLayout")
-    categoryLayout.Padding = UDim.new(0, 30)
-    categoryLayout.Parent = categoryList
-
-    local ModuleFrame = Instance.new("Frame")
-    ModuleFrame.Size = UDim2.new(0, 150, 1, -6)
-    ModuleFrame.Position = UDim2.new(0, 80, 0, 3)
-    ModuleFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-    ModuleFrame.BorderSizePixel = 0
-    ModuleFrame.Parent = mainFrame
-
-    local moduleList = Instance.new("ScrollingFrame")
-    moduleList.Size = UDim2.new(1, 0, 1, -50)
-    moduleList.Position = UDim2.new(0, 10, 0, 100)
-    moduleList.BackgroundTransparency = 1
-    moduleList.ScrollBarThickness = 0
-    moduleList.CanvasSize = UDim2.new(0, 0, 0, 500)
-    moduleList.Parent = ModuleFrame
-
-    local moduleLayout = Instance.new("UIListLayout")
-    moduleLayout.Padding = UDim.new(0, 10)
-    moduleLayout.Parent = moduleList
-
-    local activeCategory = nil
-
-    activeCategoryLabel = Instance.new("TextLabel")
-    activeCategoryLabel.Size = UDim2.new(0, 300, 0, 50)
-    activeCategoryLabel.Position = UDim2.new(0.5, -350, 0.5, -280)
-    activeCategoryLabel.BackgroundTransparency = 1
-    activeCategoryLabel.Text = ""
-    activeCategoryLabel.TextSize = 22
-    activeCategoryLabel.Font = Enum.Font.Gotham
-    activeCategoryLabel.TextColor3 = Color3.fromRGB(150, 153, 163)
-    activeCategoryLabel.TextXAlignment = Enum.TextXAlignment.Left
-    activeCategoryLabel.Parent = mainFrame
-
-    slashLabel = Instance.new("TextLabel")
-    slashLabel.Size = UDim2.new(0, 20, 0, 50)
-    slashLabel.Position = UDim2.new(0.5, -205, 0.5, -280)
-    slashLabel.BackgroundTransparency = 1
-    slashLabel.Text = "/"
-    slashLabel.TextSize = 22
-    slashLabel.Font = Enum.Font.Gotham
-    slashLabel.TextColor3 = Color3.fromRGB(150, 153, 163)
-    slashLabel.TextXAlignment = Enum.TextXAlignment.Left
-    slashLabel.Visible = false
-    slashLabel.Parent = mainFrame
-
-    moduleNameLabel = Instance.new("TextLabel")
-    moduleNameLabel.Size = UDim2.new(0, 300, 0, 50)
-    moduleNameLabel.Position = UDim2.new(0.5, -190, 0.5, -280)
-    moduleNameLabel.BackgroundTransparency = 1
-    moduleNameLabel.Text = ""
-    moduleNameLabel.TextSize = 22
-    moduleNameLabel.Font = Enum.Font.Gotham
-    moduleNameLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
-    moduleNameLabel.TextXAlignment = Enum.TextXAlignment.Left
-    moduleNameLabel.Parent = mainFrame
-
-    local UmbrellaIcon = Instance.new("ImageLabel")
-    UmbrellaIcon.Size = UDim2.new(0, 50, 0, 50)
-    UmbrellaIcon.Position = UDim2.new(0.5, -435, 0.5, -290)
-    UmbrellaIcon.BackgroundTransparency = 1
-    UmbrellaIcon.Image = "http://www.roblox.com/asset/?id=95285379105237"
-    UmbrellaIcon.Parent = mainFrame
-    
-    local function addCategory(icon, name)
-        local categoryButton = Instance.new("Frame")
-        categoryButton.Size = UDim2.new(0, 50, 0, 50)
-        categoryButton.Position = UDim2.new(0, 5, 0, 5)
-        categoryButton.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-        categoryButton.BorderSizePixel = 0
-        categoryButton.Parent = categoryList
-
-        local categoryCorner = Instance.new("UICorner")
-        categoryCorner.CornerRadius = UDim.new(0, 8)
-        categoryCorner.Parent = categoryButton
-
-        local iconImage = Instance.new("ImageLabel")
-        iconImage.Size = UDim2.new(0, 30, 0, 30)
-        iconImage.Position = UDim2.new(0.5, -15, 0.5, -15)
-        iconImage.BackgroundTransparency = 1
-        iconImage.Image = icon
-        iconImage.ImageColor3 = Color3.fromRGB(150, 150, 150)
-        iconImage.Parent = categoryButton
-
-        local redLine = Instance.new("Frame")
-        redLine.Size = UDim2.new(0, 2, 0, 0)
-        redLine.Position = UDim2.new(0, 0, 0.5, 0)
-        redLine.AnchorPoint = Vector2.new(0, 0.5)
-        redLine.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
-        redLine.Transparency = 1
-        redLine.Parent = categoryButton
-
-        local clickDetector = Instance.new("TextButton")
-        clickDetector.Size = UDim2.new(1, 0, 1, 0)
-        clickDetector.BackgroundTransparency = 1
-        clickDetector.Text = ""
-        clickDetector.Parent = categoryButton
-
-        clickDetector.MouseEnter:Connect(function()
-            if activeCategory ~= categoryButton then
-                tweenColor(iconImage, "ImageColor3", Color3.fromRGB(200, 200, 200), 0.15)
-            end
-        end)
-
-        clickDetector.MouseLeave:Connect(function()
-            if activeCategory ~= categoryButton then
-                tweenColor(iconImage, "ImageColor3", Color3.fromRGB(150, 150, 150), 0.15)
-            end
-        end)
-
-        clickDetector.MouseButton1Click:Connect(function()
-            if activeCategory == categoryButton then return end
-
-            if activeCategory then
-                local prevIcon = activeCategory:FindFirstChild("ImageLabel")
-                local prevLine = activeCategory:FindFirstChild("Frame")
-
-                if prevIcon then
-                    tweenColor(prevIcon, "ImageColor3", Color3.fromRGB(150, 150, 150))
-                end
-                if prevLine then
-                    tweenTransparency(prevLine, "Transparency", 1)
-                    tweenSize(prevLine, "Size", UDim2.new(0, 2, 0, 0))
-                end
-                tweenColor(activeCategory, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
-            end
-
-            activeCategory = categoryButton
-            moduleSystem.activeCategory = name
-
-            tweenColor(categoryButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
-            tweenColor(iconImage, "ImageColor3", Color3.fromRGB(255, 75, 75))
-
-            redLine.Transparency = 0
-            tweenSize(redLine, "Size", UDim2.new(0, 2, 0, 20))
-
-            activeCategoryLabel.Text = name
-            slashLabel.Visible = false
-            moduleNameLabel.Text = ""
-            
-            clearSettingsContainer()
-            updateModuleList(moduleList, name)
-        end)
-    end
-
-    addCategory("http://www.roblox.com/asset/?id=103577523623326", "Server")
-    addCategory("http://www.roblox.com/asset/?id=136613041915472", "World")
-    addCategory("http://www.roblox.com/asset/?id=85568792810849", "Player")
-    addCategory("http://www.roblox.com/asset/?id=124280107087786", "Utility")
-    addCategory("http://www.roblox.com/asset/?id=109730932565942", "Combat")
-    
-    local settingsContainer = Instance.new("Frame")
-    settingsContainer.Name = "SettingsContainer"
-    settingsContainer.Size = UDim2.new(0, 615, 0, 0)
-    settingsContainer.Position = UDim2.new(0, 257, 0, 90)
-    settingsContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-    settingsContainer.BackgroundTransparency = 1
-    settingsContainer.Parent = mainFrame
-
-    local settingsCorner = Instance.new("UICorner")
-    settingsCorner.CornerRadius = UDim.new(0, 8)
-    settingsCorner.Parent = settingsContainer
-
-    _G.mainFrame = mainFrame
-    _G.isGUIVisible = true
-    
-    -- Показываем GUI с анимацией
-    mainFrame.Visible = true
-    TweenService:Create(mainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {
-        Size = UDim2.new(0, 900, 0, 600),
-        Position = UDim2.new(0.5, -450, 0.5, -300)
-    }):Play()
-    
-    -- Создаем кнопку переключения после создания основного UI
-    task.wait(0.5)
-    createToggleButton()
-end
-
-function API:registerCallback(moduleName, callbacks)
-    self.callbacks[moduleName] = callbacks
-end
-
-local function init(config)
-    if config and config.moduleSystem then
-        for k,v in pairs(config.moduleSystem) do
-            moduleSystem[k] = v
-        end
-    end
-
-    if config and config.moduleSettings then
-        for k,v in pairs(config.moduleSettings) do
-            API.settings[k] = v
-            moduleSettings[k] = v
-        end
-    end
-
-    -- Сначала показываем ключ систему
-    if not _G.keySystemPassed then
-        createKeySystem()
-    else
-        -- Если ключ уже пройден, сразу создаем основной UI
-        createMainUI()
-    end
-    
-    API:loadSettings()
-end
-
-return {
-    init = init,
-    api = API
-}local player = game:GetService("Players").LocalPlayer
+local player = game:GetService("Players").LocalPlayer
 local existingUI = player.PlayerGui:FindFirstChild("MyUI")
 if existingUI then
     existingUI:Destroy()
@@ -507,79 +89,6 @@ local function loadSettings()
 end
 
 loadSettings()
-
--- ИСПРАВЛЕННАЯ система для сохранения оригинальных значений прозрачности
-local originalTransparencies = {}
-
-local function saveOriginalTransparency(object, property)
-    local key = tostring(object) .. "_" .. property
-    if not originalTransparencies[key] then
-        originalTransparencies[key] = object[property]
-    end
-end
-
-local function restoreOriginalTransparency(object, property)
-    local key = tostring(object) .. "_" .. property
-    if originalTransparencies[key] then
-        object[property] = originalTransparencies[key]
-    end
-end
-
--- ИСПРАВЛЕННАЯ функция для анимации скрытия/показа GUI элементов
-local function animateGuiElements(frame, show, duration)
-    duration = duration or 0.3
-    
-    local function processElement(element)
-        -- Пропускаем UICorner и другие не-GUI объекты
-        if not element:IsA("GuiObject") then
-            return
-        end
-        
-        if element:IsA("Frame") or element:IsA("ScrollingFrame") then
-            saveOriginalTransparency(element, "BackgroundTransparency")
-            local originalTransparency = originalTransparencies[tostring(element) .. "_BackgroundTransparency"]
-            local targetTransparency = show and originalTransparency or 1
-            TweenService:Create(element, TweenInfo.new(duration), {BackgroundTransparency = targetTransparency}):Play()
-        elseif element:IsA("TextLabel") or element:IsA("TextButton") or element:IsA("TextBox") then
-            -- Обрабатываем текст
-            saveOriginalTransparency(element, "TextTransparency")
-            local originalTextTransparency = originalTransparencies[tostring(element) .. "_TextTransparency"]
-            local targetTextTransparency = show and originalTextTransparency or 1
-            TweenService:Create(element, TweenInfo.new(duration), {TextTransparency = targetTextTransparency}):Play()
-            
-            -- Обрабатываем фон если он есть
-            if element.BackgroundTransparency < 1 then
-                saveOriginalTransparency(element, "BackgroundTransparency")
-                local originalBgTransparency = originalTransparencies[tostring(element) .. "_BackgroundTransparency"]
-                local targetBgTransparency = show and originalBgTransparency or 1
-                TweenService:Create(element, TweenInfo.new(duration), {BackgroundTransparency = targetBgTransparency}):Play()
-            end
-        elseif element:IsA("ImageLabel") or element:IsA("ImageButton") then
-            -- Обрабатываем изображение
-            saveOriginalTransparency(element, "ImageTransparency")
-            local originalImageTransparency = originalTransparencies[tostring(element) .. "_ImageTransparency"]
-            local targetImageTransparency = show and originalImageTransparency or 1
-            TweenService:Create(element, TweenInfo.new(duration), {ImageTransparency = targetImageTransparency}):Play()
-            
-            -- Обрабатываем фон если он есть
-            if element.BackgroundTransparency < 1 then
-                saveOriginalTransparency(element, "BackgroundTransparency")
-                local originalBgTransparency = originalTransparencies[tostring(element) .. "_BackgroundTransparency"]
-                local targetBgTransparency = show and originalBgTransparency or 1
-                TweenService:Create(element, TweenInfo.new(duration), {BackgroundTransparency = targetBgTransparency}):Play()
-            end
-        end
-        
-        -- Рекурсивно обрабатываем дочерние элементы
-        for _, child in pairs(element:GetChildren()) do
-            if child:IsA("GuiObject") then
-                processElement(child)
-            end
-        end
-    end
-    
-    processElement(frame)
-end
 
 -- Система уведомлений
 local notificationsGui = Instance.new("ScreenGui")
@@ -870,11 +379,10 @@ local function createKeySystem()
     end)
 end
 
--- ИСПРАВЛЕННАЯ функция регистрации модуля с автоматическим созданием Enable настройки
 function API:registerModule(category, moduleData)
     self.modules[category] = self.modules[category] or {}
     
-    -- Автоматически создаём настройку Enable для каждого модуля
+    -- Автоматически создаем настройку тоггла для каждого модуля
     if not self.settings[moduleData.name] then
         self.settings[moduleData.name] = {
             settings = {
@@ -883,13 +391,10 @@ function API:registerModule(category, moduleData)
                     type = "toggle",
                     default = moduleData.enabled or false,
                     callback = function(value)
-                        -- НЕ вызываем callback модуля здесь, только сохраняем состояние
                         moduleData.enabled = value
                         saveModuleState(moduleData.name, value)
-                        
-                        -- Обновляем визуальное состояние в GUI если оно существует
-                        if _G.mainFrame then
-                            updateModuleVisualState(moduleData.name, value)
+                        if moduleData.callback then
+                            pcall(moduleData.callback, value)
                         end
                     end
                 }
@@ -899,26 +404,21 @@ function API:registerModule(category, moduleData)
     
     table.insert(self.modules[category], moduleData)
     
-    -- Загружаем сохранённое состояние
+    -- Загружаем сохраненное состояние
     if self.savedModuleStates[moduleData.name] ~= nil then
         moduleData.enabled = self.savedModuleStates[moduleData.name]
-        -- НЕ применяем callback автоматически при загрузке
+        -- Автоматически применяем состояние при загрузке
+        if moduleData.enabled and moduleData.callback then
+            pcall(moduleData.callback, true)
+        end
     end
 end
 
 function API:registerSettings(moduleName, settingsTable)
-    -- Если модуль уже имеет автоматически созданные настройки, добавляем к ним новые
-    if self.settings[moduleName] then
-        for _, setting in ipairs(settingsTable) do
-            table.insert(self.settings[moduleName].settings, setting)
-        end
-    else
-        self.settings[moduleName] = {settings = settingsTable}
-    end
+    self.settings[moduleName] = {settings = settingsTable}
     
     if API.savedSettings[moduleName] then
-        local allSettings = self.settings[moduleName].settings
-        for _, setting in ipairs(allSettings) do
+        for _, setting in ipairs(settingsTable) do
             if API.savedSettings[moduleName][setting.name] ~= nil then
                 setting.default = API.savedSettings[moduleName][setting.name]
                 if setting.callback then
@@ -1365,7 +865,6 @@ local function createSlider(parent, setting, position)
     return frame
 end
 
--- ИСПРАВЛЕННАЯ функция создания toggle с правильной обработкой callback
 local function createToggle(parent, setting, position)
     local outerFrame = Instance.new("Frame")
     outerFrame.Size = UDim2.new(0, 280, 0, 50)
@@ -1430,22 +929,7 @@ local function createToggle(parent, setting, position)
             API.savedSettings[setting.moduleName][setting.name] = isEnabled
             saveSettings()
             
-            -- Особая обработка для настройки "Enabled" - вызываем callback модуля
-            if setting.name == "Enabled" and setting.callback then
-                setting.callback(isEnabled)
-                
-                -- Дополнительно вызываем callback модуля если он существует
-                for category, modules in pairs(API.modules) do
-                    for _, module in ipairs(modules) do
-                        if module.name == setting.moduleName then
-                            if module.callback then
-                                pcall(module.callback, isEnabled)
-                            end
-                            break
-                        end
-                    end
-                end
-            elseif setting.callback then
+            if setting.callback then
                 setting.callback(isEnabled)
             end
         end
@@ -1461,13 +945,16 @@ end
 function API:loadSettings()
     loadSettings()
     
-    -- Применяем сохранённые состояния модулей при загрузке
+    -- Применяем сохраненные состояния модулей при загрузке
     for moduleName, enabled in pairs(self.savedModuleStates) do
         for category, modules in pairs(self.modules) do
             for _, module in ipairs(modules) do
                 if module.name == moduleName then
                     module.enabled = enabled
-                    -- НЕ автоматически включаем модуль при загрузке
+                    -- Автоматически включаем модуль если он был включен
+                    if enabled and module.callback then
+                        pcall(module.callback, true)
+                    end
                     break
                 end
             end
@@ -1480,7 +967,9 @@ function API:loadSettings()
             for _, setting in ipairs(settings.settings) do
                 if self.savedSettings[moduleName][setting.name] ~= nil then
                     setting.default = self.savedSettings[moduleName][setting.name]
-                    -- НЕ вызываем callback при загрузке настроек
+                    if setting.callback then
+                        pcall(setting.callback, setting.default)
+                    end
                 end
             end
         end
@@ -1496,17 +985,13 @@ local function saveModuleState(moduleName, enabled)
         for _, module in ipairs(modules) do
             if module.name == moduleName then
                 module.enabled = enabled
-                -- НЕ вызываем callback здесь, это делается в другом месте
+                if module.callback then
+                    pcall(module.callback, enabled)
+                end
                 break
             end
         end
     end
-end
-
--- Функция для обновления визуального состояния модуля в GUI
-function updateModuleVisualState(moduleName, enabled)
-    -- Эта функция будет обновлять визуальное состояние в GUI
-    -- без вызова callback функции модуля
 end
 
 local function showModuleSettings(moduleName)
@@ -1593,14 +1078,12 @@ local function createModuleButton(parent, moduleData)
 
     local clickDetector = Instance.new("TextButton")
     clickDetector.Size = UDim2.new(1, 0, 1, 0)
-    clickDetector.Position = UDim2.new(0, 0, 0, 0)
     clickDetector.BackgroundTransparency = 1
     clickDetector.Text = ""
     clickDetector.ZIndex = 10
     clickDetector.Parent = moduleButton
 
-    local debounce = false
-
+    -- Подсветка если модуль уже включен
     if moduleData.enabled then
         moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
         moduleName.TextColor3 = Color3.fromRGB(255, 75, 75)
@@ -1608,58 +1091,49 @@ local function createModuleButton(parent, moduleData)
         activeLine.Transparency = 0
     end
 
+    -- Hover эффекты
     clickDetector.MouseEnter:Connect(function()
-        if not moduleData.enabled then
-            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(20, 20, 22), 0.15)
-            tweenColor(moduleName, "TextColor3", Color3.fromRGB(180, 183, 193), 0.15)
-        end
+        tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(20, 20, 22), 0.15)
+        tweenColor(moduleName, "TextColor3", Color3.fromRGB(180, 183, 193), 0.15)
     end)
 
     clickDetector.MouseLeave:Connect(function()
         if not moduleData.enabled then
             tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17), 0.15)
             tweenColor(moduleName, "TextColor3", Color3.fromRGB(150, 153, 163), 0.15)
+        else
+            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30), 0.15)
+            tweenColor(moduleName, "TextColor3", Color3.fromRGB(255, 75, 75), 0.15)
         end
     end)
 
-    -- ИСПРАВЛЕННЫЙ обработчик клика - НЕ переключаем модуль при открытии настроек
+    -- Клик → выбор модуля (но НЕ переключение enabled!)
     clickDetector.MouseButton1Click:Connect(function()
-        if debounce then return end
-        debounce = true
-
-        -- Сбрасываем визуальное состояние других модулей но НЕ меняем их enabled состояние
+        -- сбрасываем подсветку у других
         for _, otherButton in pairs(parent:GetChildren()) do
             if otherButton:IsA("Frame") and otherButton ~= moduleButton then
                 local otherLine = otherButton:FindFirstChild("Frame")
                 local otherText = otherButton:FindFirstChild("TextLabel")
-
-                if otherLine then 
-                    tweenTransparency(otherLine, "Transparency", 1)
-                    tweenSize(otherLine, "Size", UDim2.new(0, 2, 0, 0))
-                end
-                if otherText then 
-                    tweenColor(otherText, "TextColor3", Color3.fromRGB(150, 153, 163)) 
+                tweenTransparency(otherLine, "Transparency", 1)
+                tweenSize(otherLine, "Size", UDim2.new(0, 2, 0, 0))
+                if otherText then
+                    tweenColor(otherText, "TextColor3", Color3.fromRGB(150, 153, 163))
                 end
                 tweenColor(otherButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
             end
         end
 
-        -- Показываем активное состояние только для визуала
+        -- подсветка активного
         tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
         tweenColor(moduleName, "TextColor3", Color3.fromRGB(255, 75, 75))
         activeLine.Transparency = 0
         tweenSize(activeLine, "Size", UDim2.new(0, 2, 1, -20))
 
-        -- Обновляем интерфейс
+        -- показать настройки
         slashLabel.Visible = true
         moduleNameLabel.Text = moduleData.name
-        tweenColor(moduleNameLabel, "TextColor3", Color3.fromRGB(255, 75, 75))
         moduleSystem.activeModuleName = moduleData.name
-        
-        -- Показываем настройки модуля БЕЗ изменения состояния модуля
         showModuleSettings(moduleData.name)
-
-        debounce = false
     end)
 
     return moduleButton
@@ -1679,7 +1153,6 @@ local function updateModuleList(moduleFrame, categoryName)
             moduleButton:SetAttribute("ModuleIndex", index)
             moduleButton.Parent = moduleFrame
 
-            -- Показываем визуальное состояние только если модуль действительно включен
             if moduleData.enabled then
                 local activeLine = moduleButton:FindFirstChild("Frame")
                 local moduleName = moduleButton:FindFirstChild("TextLabel")
@@ -1696,7 +1169,373 @@ local function updateModuleList(moduleFrame, categoryName)
                 moduleNameLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
                 moduleSystem.activeModuleName = moduleData.name
                 showModuleSettings(moduleData.name)
+                
+                if API.callbacks[moduleData.name] and API.callbacks[moduleData.name].onEnable then
+                    pcall(API.callbacks[moduleData.name].onEnable)
+                end
             end
         end
     end
 end
+
+-- Улучшенная функция для переключения видимости GUI
+local function toggleGUI()
+    if not _G.keySystemPassed or not _G.mainFrame then return end
+    
+    _G.isGUIVisible = not _G.isGUIVisible
+    _G.mainFrame.Visible = _G.isGUIVisible
+    
+    if _G.isGUIVisible then
+        showNotification("Press Left Alt to close GUI", Color3.fromRGB(100, 255, 100), 2)
+    else
+        showNotification("Press Left Alt to open GUI", Color3.fromRGB(100, 255, 100), 2)
+    end
+end
+
+-- Создание кнопки переключения с прозрачным фоном
+local function createToggleButton()
+    if not _G.keySystemPassed then return end
+    
+    local toggleGui = Instance.new("ScreenGui")
+    toggleGui.Name = "UmbrellaToggle"
+    toggleGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    toggleGui.Parent = player:WaitForChild("PlayerGui")
+    
+    local toggleButton = Instance.new("ImageButton")
+    toggleButton.Name = "ToggleButton"
+    toggleButton.Size = UDim2.new(0, 50, 0, 50)
+    toggleButton.Position = UDim2.new(0, 20, 0, 20)
+    toggleButton.BackgroundTransparency = 1 -- Полностью прозрачный фон
+    toggleButton.Image = "http://www.roblox.com/asset/?id=95285379105237"
+    toggleButton.BorderSizePixel = 0
+    toggleButton.Parent = toggleGui
+    
+    -- Убираем уголки так как фон прозрачный
+    toggleButton.MouseButton1Click:Connect(function()
+        toggleGUI()
+    end)
+    
+    -- Делаем кнопку перетаскиваемой
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
+    
+    toggleButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = toggleButton.Position
+        end
+    end)
+    
+    toggleButton.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    UIS.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            toggleButton.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
+-- Обработка нажатия Left Alt для переключения GUI
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.LeftAlt then
+        toggleGUI()
+    end
+end)
+
+function createMainUI()
+    local Players = game:GetService("Players")
+    local player = Players.LocalPlayer
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "MyUI"
+    screenGui.Parent = player:WaitForChild("PlayerGui")
+
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 900, 0, 600)
+    mainFrame.Position = UDim2.new(0.5, -450, 0.5, -300)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Visible = false
+    mainFrame.Parent = screenGui
+
+    local mainCorner = Instance.new("UICorner")
+    mainCorner.CornerRadius = UDim.new(0, 8)
+    mainCorner.Parent = mainFrame
+
+    local dragging = false
+    local dragStart
+    local startPos
+
+    local topBar = Instance.new("Frame")
+    topBar.Size = UDim2.new(1, 0, 0, 60)
+    topBar.Position = UDim2.new(0, 0, 0, 0)
+    topBar.BackgroundTransparency = 1
+    topBar.Parent = mainFrame
+
+    local function updateDrag(input)
+        local delta = input.Position - dragStart
+        local position = UDim2.new(
+            startPos.X.Scale,
+            math.floor(startPos.X.Offset + delta.X),
+            startPos.Y.Scale,
+            math.floor(startPos.Y.Offset + delta.Y)
+        )
+        TweenService:Create(mainFrame, TweenInfo.new(0.1), {Position = position}):Play()
+    end
+
+    topBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = mainFrame.Position
+
+            local connection
+            connection = UIS.InputEnded:Connect(function(inputEnd)
+                if inputEnd.UserInputType == Enum.UserInputType.MouseButton1 then
+                    dragging = false
+                    connection:Disconnect()
+                end
+            end)
+        end
+    end)
+
+    UIS.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateDrag(input)
+        end
+    end)
+    
+    local categoryFrame = Instance.new("Frame")
+    categoryFrame.Size = UDim2.new(0, 75, 1, -6)
+    categoryFrame.Position = UDim2.new(0, 3, 0, 3)
+    categoryFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+    categoryFrame.BorderSizePixel = 0
+    categoryFrame.Parent = mainFrame
+
+    local categoryList = Instance.new("ScrollingFrame")
+    categoryList.Size = UDim2.new(1, 0, 1, 0)
+    categoryList.Position = UDim2.new(0, 12, 0, 100)
+    categoryList.BackgroundTransparency = 1
+    categoryList.ScrollBarThickness = 0
+    categoryList.CanvasSize = UDim2.new(0, 0, 0, 500)
+    categoryList.Parent = categoryFrame
+
+    local categoryLayout = Instance.new("UIListLayout")
+    categoryLayout.Padding = UDim.new(0, 30)
+    categoryLayout.Parent = categoryList
+
+    local ModuleFrame = Instance.new("Frame")
+    ModuleFrame.Size = UDim2.new(0, 150, 1, -6)
+    ModuleFrame.Position = UDim2.new(0, 80, 0, 3)
+    ModuleFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+    ModuleFrame.BorderSizePixel = 0
+    ModuleFrame.Parent = mainFrame
+
+    local moduleList = Instance.new("ScrollingFrame")
+    moduleList.Size = UDim2.new(1, 0, 1, -50)
+    moduleList.Position = UDim2.new(0, 10, 0, 100)
+    moduleList.BackgroundTransparency = 1
+    moduleList.ScrollBarThickness = 0
+    moduleList.CanvasSize = UDim2.new(0, 0, 0, 500)
+    moduleList.Parent = ModuleFrame
+
+    local moduleLayout = Instance.new("UIListLayout")
+    moduleLayout.Padding = UDim.new(0, 10)
+    moduleLayout.Parent = moduleList
+
+    local activeCategory = nil
+
+    activeCategoryLabel = Instance.new("TextLabel")
+    activeCategoryLabel.Size = UDim2.new(0, 300, 0, 50)
+    activeCategoryLabel.Position = UDim2.new(0.5, -350, 0.5, -280)
+    activeCategoryLabel.BackgroundTransparency = 1
+    activeCategoryLabel.Text = ""
+    activeCategoryLabel.TextSize = 22
+    activeCategoryLabel.Font = Enum.Font.Gotham
+    activeCategoryLabel.TextColor3 = Color3.fromRGB(150, 153, 163)
+    activeCategoryLabel.TextXAlignment = Enum.TextXAlignment.Left
+    activeCategoryLabel.Parent = mainFrame
+
+    slashLabel = Instance.new("TextLabel")
+    slashLabel.Size = UDim2.new(0, 20, 0, 50)
+    slashLabel.Position = UDim2.new(0.5, -205, 0.5, -280)
+    slashLabel.BackgroundTransparency = 1
+    slashLabel.Text = "/"
+    slashLabel.TextSize = 22
+    slashLabel.Font = Enum.Font.Gotham
+    slashLabel.TextColor3 = Color3.fromRGB(150, 153, 163)
+    slashLabel.TextXAlignment = Enum.TextXAlignment.Left
+    slashLabel.Visible = false
+    slashLabel.Parent = mainFrame
+
+    moduleNameLabel = Instance.new("TextLabel")
+    moduleNameLabel.Size = UDim2.new(0, 300, 0, 50)
+    moduleNameLabel.Position = UDim2.new(0.5, -190, 0.5, -280)
+    moduleNameLabel.BackgroundTransparency = 1
+    moduleNameLabel.Text = ""
+    moduleNameLabel.TextSize = 22
+    moduleNameLabel.Font = Enum.Font.Gotham
+    moduleNameLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
+    moduleNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    moduleNameLabel.Parent = mainFrame
+
+    local UmbrellaIcon = Instance.new("ImageLabel")
+    UmbrellaIcon.Size = UDim2.new(0, 50, 0, 50)
+    UmbrellaIcon.Position = UDim2.new(0.5, -435, 0.5, -290)
+    UmbrellaIcon.BackgroundTransparency = 1
+    UmbrellaIcon.Image = "http://www.roblox.com/asset/?id=95285379105237"
+    UmbrellaIcon.Parent = mainFrame
+    
+    local function addCategory(icon, name)
+        local categoryButton = Instance.new("Frame")
+        categoryButton.Size = UDim2.new(0, 50, 0, 50)
+        categoryButton.Position = UDim2.new(0, 5, 0, 5)
+        categoryButton.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+        categoryButton.BorderSizePixel = 0
+        categoryButton.Parent = categoryList
+
+        local categoryCorner = Instance.new("UICorner")
+        categoryCorner.CornerRadius = UDim.new(0, 8)
+        categoryCorner.Parent = categoryButton
+
+        local iconImage = Instance.new("ImageLabel")
+        iconImage.Size = UDim2.new(0, 30, 0, 30)
+        iconImage.Position = UDim2.new(0.5, -15, 0.5, -15)
+        iconImage.BackgroundTransparency = 1
+        iconImage.Image = icon
+        iconImage.ImageColor3 = Color3.fromRGB(150, 150, 150)
+        iconImage.Parent = categoryButton
+
+        local redLine = Instance.new("Frame")
+        redLine.Size = UDim2.new(0, 2, 0, 0)
+        redLine.Position = UDim2.new(0, 0, 0.5, 0)
+        redLine.AnchorPoint = Vector2.new(0, 0.5)
+        redLine.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
+        redLine.Transparency = 1
+        redLine.Parent = categoryButton
+
+        local clickDetector = Instance.new("TextButton")
+        clickDetector.Size = UDim2.new(1, 0, 1, 0)
+        clickDetector.BackgroundTransparency = 1
+        clickDetector.Text = ""
+        clickDetector.Parent = categoryButton
+
+        clickDetector.MouseEnter:Connect(function()
+            if activeCategory ~= categoryButton then
+                tweenColor(iconImage, "ImageColor3", Color3.fromRGB(200, 200, 200), 0.15)
+            end
+        end)
+
+        clickDetector.MouseLeave:Connect(function()
+            if activeCategory ~= categoryButton then
+                tweenColor(iconImage, "ImageColor3", Color3.fromRGB(150, 150, 150), 0.15)
+            end
+        end)
+
+        clickDetector.MouseButton1Click:Connect(function()
+            if activeCategory == categoryButton then return end
+
+            if activeCategory then
+                local prevIcon = activeCategory:FindFirstChild("ImageLabel")
+                local prevLine = activeCategory:FindFirstChild("Frame")
+
+                if prevIcon then
+                    tweenColor(prevIcon, "ImageColor3", Color3.fromRGB(150, 150, 150))
+                end
+                if prevLine then
+                    tweenTransparency(prevLine, "Transparency", 1)
+                    tweenSize(prevLine, "Size", UDim2.new(0, 2, 0, 0))
+                end
+                tweenColor(activeCategory, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
+            end
+
+            activeCategory = categoryButton
+            moduleSystem.activeCategory = name
+
+            tweenColor(categoryButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
+            tweenColor(iconImage, "ImageColor3", Color3.fromRGB(255, 75, 75))
+
+            redLine.Transparency = 0
+            tweenSize(redLine, "Size", UDim2.new(0, 2, 0, 20))
+
+            activeCategoryLabel.Text = name
+            slashLabel.Visible = false
+            moduleNameLabel.Text = ""
+            
+            clearSettingsContainer()
+            updateModuleList(moduleList, name)
+        end)
+    end
+
+    addCategory("http://www.roblox.com/asset/?id=103577523623326", "Server")
+    addCategory("http://www.roblox.com/asset/?id=136613041915472", "World")
+    addCategory("http://www.roblox.com/asset/?id=85568792810849", "Player")
+    addCategory("http://www.roblox.com/asset/?id=124280107087786", "Utility")
+    addCategory("http://www.roblox.com/asset/?id=109730932565942", "Combat")
+    
+    local settingsContainer = Instance.new("Frame")
+    settingsContainer.Name = "SettingsContainer"
+    settingsContainer.Size = UDim2.new(0, 615, 0, 0)
+    settingsContainer.Position = UDim2.new(0, 257, 0, 90)
+    settingsContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+    settingsContainer.BackgroundTransparency = 1
+    settingsContainer.Parent = mainFrame
+
+    local settingsCorner = Instance.new("UICorner")
+    settingsCorner.CornerRadius = UDim.new(0, 8)
+    settingsCorner.Parent = settingsContainer
+
+    _G.mainFrame = mainFrame
+    _G.isGUIVisible = false
+    
+    -- Создаем кнопку переключения после создания основного UI
+    createToggleButton()
+end
+
+function API:registerCallback(moduleName, callbacks)
+    self.callbacks[moduleName] = callbacks
+end
+
+local function init(config)
+    if config and config.moduleSystem then
+        for k,v in pairs(config.moduleSystem) do
+            moduleSystem[k] = v
+        end
+    end
+
+    if config and config.moduleSettings then
+        for k,v in pairs(config.moduleSettings) do
+            API.settings[k] = v
+            moduleSettings[k] = v
+        end
+    end
+
+    -- Сначала показываем ключ систему
+    if not _G.keySystemPassed then
+        createKeySystem()
+    else
+        -- Если ключ уже пройден, сразу создаем основной UI
+        createMainUI()
+    end
+    
+    API:loadSettings()
+end
+
+return {
+    init = init,
+    api = API
+}
