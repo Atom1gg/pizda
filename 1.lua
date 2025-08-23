@@ -613,11 +613,17 @@ local function createDropDown(parent, setting, position)
     dropDownCorner.CornerRadius = UDim.new(0, 4)
     dropDownCorner.Parent = dropDownButton
 
+    -- ИСПРАВЛЕНО: Загружаем сохраненное значение
+    local selectedValue = setting.default or "Select..."
+    if API.savedSettings[setting.moduleName] and API.savedSettings[setting.moduleName][setting.name] ~= nil then
+        selectedValue = API.savedSettings[setting.moduleName][setting.name]
+    end
+
     local selectedText = Instance.new("TextLabel")
     selectedText.Size = UDim2.new(1, -10, 1, 0)
     selectedText.Position = UDim2.new(0, 5, 0, 0)
     selectedText.BackgroundTransparency = 1
-    selectedText.Text = setting.default or "Select..."
+    selectedText.Text = selectedValue
     selectedText.TextColor3 = Color3.fromRGB(200, 200, 200)
     selectedText.Font = Enum.Font.SourceSans
     selectedText.TextSize = 18
@@ -647,7 +653,6 @@ local function createDropDown(parent, setting, position)
     menuLayout.Parent = dropDownMenu
 
     local isOpen = false
-    local selectedValue = setting.default
 
     local function updateMenu()
         for _, child in ipairs(dropDownMenu:GetChildren()) do
@@ -676,6 +681,7 @@ local function createDropDown(parent, setting, position)
                 selectedValue = option
                 selectedText.Text = option
 
+                -- ИСПРАВЛЕНО: Сохраняем изменения
                 if not API.savedSettings[setting.moduleName] then
                     API.savedSettings[setting.moduleName] = {}
                 end
@@ -749,11 +755,17 @@ local function createTextField(parent, setting, position)
     textBoxCorner.CornerRadius = UDim.new(0, 4)
     textBoxCorner.Parent = textBoxBackground
 
+    -- ИСПРАВЛЕНО: Загружаем сохраненное значение
+    local currentValue = setting.default or ""
+    if API.savedSettings[setting.moduleName] and API.savedSettings[setting.moduleName][setting.name] ~= nil then
+        currentValue = API.savedSettings[setting.moduleName][setting.name]
+    end
+
     local textBox = Instance.new("TextBox")
     textBox.Size = UDim2.new(1, -10, 1, -4)
     textBox.Position = UDim2.new(0, 5, 0, 2)
     textBox.BackgroundTransparency = 1
-    textBox.Text = setting.default or ""
+    textBox.Text = currentValue
     textBox.TextColor3 = Color3.fromRGB(200, 200, 200)
     textBox.Font = Enum.Font.SourceSans
     textBox.TextSize = 18
@@ -763,6 +775,7 @@ local function createTextField(parent, setting, position)
     textBox.Parent = textBoxBackground
 
     local function updateValue()
+        -- ИСПРАВЛЕНО: Сохраняем изменения
         if not API.savedSettings[setting.moduleName] then
             API.savedSettings[setting.moduleName] = {}
         end
@@ -780,6 +793,7 @@ local function createTextField(parent, setting, position)
 
     return frame
 end
+
 
 local function createSlider(parent, setting, position)
     local frame = Instance.new("Frame")
@@ -799,10 +813,16 @@ local function createSlider(parent, setting, position)
     label.BackgroundTransparency = 1
     label.Parent = frame
 
+    -- ИСПРАВЛЕНО: Загружаем сохраненное значение
+    local currentValue = setting.default
+    if API.savedSettings[setting.moduleName] and API.savedSettings[setting.moduleName][setting.name] ~= nil then
+        currentValue = API.savedSettings[setting.moduleName][setting.name]
+    end
+
     local valueDisplay = Instance.new("TextLabel")
     valueDisplay.Size = UDim2.new(1, 0, 0.2, 0)
     valueDisplay.Position = UDim2.new(0, -5, 0.3, -5)
-    valueDisplay.Text = tostring(setting.default) .. (setting.isPercentage and "%" or "")
+    valueDisplay.Text = tostring(currentValue) .. (setting.isPercentage and "%" or "")
     valueDisplay.TextColor3 = Color3.fromRGB(142, 142, 142)
     valueDisplay.Font = Enum.Font.SourceSans
     valueDisplay.TextSize = 22
@@ -818,7 +838,7 @@ local function createSlider(parent, setting, position)
     sliderBackground.Parent = frame
 
     local sliderActive = Instance.new("Frame")
-    sliderActive.Size = UDim2.new((setting.default - setting.min) / (setting.max - setting.min), 0, 1, 0)
+    sliderActive.Size = UDim2.new((currentValue - setting.min) / (setting.max - setting.min), 0, 1, 0)
     sliderActive.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
     sliderActive.BorderSizePixel = 0
     sliderActive.Parent = sliderBackground
@@ -833,7 +853,7 @@ local function createSlider(parent, setting, position)
 
     local sliderCircle = Instance.new("Frame")
     sliderCircle.Size = UDim2.new(0, 12, 0, 12)
-    sliderCircle.Position = UDim2.new((setting.default - setting.min) / (setting.max - setting.min), -6, 0.5, -6)
+    sliderCircle.Position = UDim2.new((currentValue - setting.min) / (setting.max - setting.min), -6, 0.5, -6)
     sliderCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     sliderCircle.BorderSizePixel = 0
     sliderCircle.Parent = sliderBackground
@@ -851,14 +871,17 @@ local function createSlider(parent, setting, position)
         sliderActive.Size = UDim2.new(relativePos, 0, 1, 0)
         valueDisplay.Text = tostring(value) .. (setting.isPercentage and "%" or "")
         
+        -- ИСПРАВЛЕНО: Сохраняем изменения
+        if not API.savedSettings[setting.moduleName] then
+            API.savedSettings[setting.moduleName] = {}
+        end
+        API.savedSettings[setting.moduleName][setting.name] = value
+        
+        -- Debounce для частых изменений
         local currentTime = tick()
         debounceTime = currentTime
         task.delay(0.5, function()
             if debounceTime == currentTime then
-                if not API.savedSettings[setting.moduleName] then
-                    API.savedSettings[setting.moduleName] = {}
-                end
-                API.savedSettings[setting.moduleName][setting.name] = value
                 saveSettings()
             end
         end)
@@ -895,7 +918,6 @@ local function createSlider(parent, setting, position)
         end
     end)
 
-    updateSlider(setting.default)
     return frame
 end
 
@@ -940,7 +962,13 @@ local function createToggle(parent, setting, position)
     circleCorner.CornerRadius = UDim.new(1, 0)
     circleCorner.Parent = switchCircle
 
+    -- ИСПРАВЛЕНО: Загружаем сохраненное значение
     local isEnabled = setting.default
+    if API.savedSettings[setting.moduleName] and API.savedSettings[setting.moduleName][setting.name] ~= nil then
+        isEnabled = API.savedSettings[setting.moduleName][setting.name]
+    end
+
+    -- Устанавливаем визуальное состояние
     if isEnabled then
         switchCircle.Position = UDim2.new(1, -19, 0, 1)
         switchCircle.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
@@ -949,6 +977,8 @@ local function createToggle(parent, setting, position)
     switchTrack.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             isEnabled = not isEnabled
+            
+            -- Анимация переключения
             if isEnabled then
                 switchCircle:TweenPosition(UDim2.new(1, -19, 0, 1), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
                 switchCircle.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
@@ -957,12 +987,21 @@ local function createToggle(parent, setting, position)
                 switchCircle.BackgroundColor3 = Color3.fromRGB(142, 142, 142)
             end
             
+            -- ИСПРАВЛЕНО: Сохраняем в правильную структуру
             if not API.savedSettings[setting.moduleName] then
                 API.savedSettings[setting.moduleName] = {}
             end
             API.savedSettings[setting.moduleName][setting.name] = isEnabled
+            
+            -- ДОБАВЛЕНО: Специальная обработка для переключателя "Enabled"
+            if setting.name == "Enabled" then
+                API.savedModuleStates[setting.moduleName] = isEnabled
+            end
+            
+            -- ИСПРАВЛЕНО: Сохраняем изменения в файл
             saveSettings()
             
+            -- Вызываем callback
             if setting.callback then
                 setting.callback(isEnabled)
             end
