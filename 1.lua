@@ -381,33 +381,12 @@ end
 
 function API:registerModule(category, moduleData)
     self.modules[category] = self.modules[category] or {}
-    
-    -- Автоматически создаем настройку тоггла для каждого модуля
-    if not self.settings[moduleData.name] then
-        self.settings[moduleData.name] = {
-            settings = {
-                {
-                    name = "Enabled",
-                    type = "toggle",
-                    default = moduleData.enabled or false,
-                    callback = function(value)
-                        moduleData.enabled = value
-                        saveModuleState(moduleData.name, value)
-                        if moduleData.callback then
-                            pcall(moduleData.callback, value)
-                        end
-                    end
-                }
-            }
-        }
-    end
-    
     table.insert(self.modules[category], moduleData)
     
-    -- Загружаем сохраненное состояние
+    -- Загружаем сохраненное состояние модуля
     if self.savedModuleStates[moduleData.name] ~= nil then
         moduleData.enabled = self.savedModuleStates[moduleData.name]
-        -- Автоматически применяем состояние при загрузке
+        -- Применяем состояние при загрузке
         if moduleData.enabled and moduleData.callback then
             pcall(moduleData.callback, true)
         end
@@ -415,17 +394,53 @@ function API:registerModule(category, moduleData)
 end
 
 function API:registerSettings(moduleName, settingsTable)
-    self.settings[moduleName] = {settings = settingsTable}
+    -- Создаем базовую структуру если её нет
+    if not self.settings[moduleName] then
+        self.settings[moduleName] = {settings = {}}
+    end
     
-    if API.savedSettings[moduleName] then
-        for _, setting in ipairs(settingsTable) do
-            if API.savedSettings[moduleName][setting.name] ~= nil then
-                setting.default = API.savedSettings[moduleName][setting.name]
-                if setting.callback then
-                    pcall(setting.callback, setting.default)
+    -- Добавляем переключатель Enabled в начало списка настроек
+    local enabledToggle = {
+        name = "Enabled",
+        type = "toggle",
+        default = false,
+        callback = function(value)
+            -- Находим модуль и обновляем его состояние
+            for category, modules in pairs(self.modules) do
+                for _, module in ipairs(modules) do
+                    if module.name == moduleName then
+                        module.enabled = value
+                        saveModuleState(moduleName, value)
+                        if module.callback then
+                            pcall(module.callback, value)
+                        end
+                        break
+                    end
                 end
             end
         end
+    }
+    
+    -- Объединяем настройки: сначала Enabled, потом пользовательские
+    local allSettings = {enabledToggle}
+    for _, setting in ipairs(settingsTable) do
+        table.insert(allSettings, setting)
+    end
+    
+    self.settings[moduleName] = {settings = allSettings}
+    
+    -- Загружаем сохраненные значения ТОЛЬКО ОДИН РАЗ
+    if self.savedSettings[moduleName] then
+        for _, setting in ipairs(allSettings) do
+            if self.savedSettings[moduleName][setting.name] ~= nil then
+                setting.default = self.savedSettings[moduleName][setting.name]
+            end
+        end
+    end
+    
+    -- Загружаем сохраненное состояние модуля для переключателя Enabled
+    if self.savedModuleStates[moduleName] ~= nil then
+        enabledToggle.default = self.savedModuleStates[moduleName]
     end
 end
 
@@ -961,15 +976,13 @@ function API:loadSettings()
         end
     end
     
-    -- Загружаем остальные настройки
+    -- Применяем сохраненные настройки ТОЛЬКО при загрузке, БЕЗ вызова callback'ов
     for moduleName, settings in pairs(self.settings) do
         if self.savedSettings[moduleName] then
             for _, setting in ipairs(settings.settings) do
                 if self.savedSettings[moduleName][setting.name] ~= nil then
                     setting.default = self.savedSettings[moduleName][setting.name]
-                    if setting.callback then
-                        pcall(setting.callback, setting.default)
-                    end
+                    -- НЕ ВЫЗЫВАЕМ callback здесь!
                 end
             end
         end
@@ -996,7 +1009,7 @@ end
 
 local function showModuleSettings(moduleName)
     clearSettingsContainer()
-    API:loadSettings()
+    -- УБИРАЕМ ЭТУ СТРОКУ: API:loadSettings()
     
     local settingsContainer = _G.mainFrame:FindFirstChild("SettingsContainer")
     if not settingsContainer then return end
