@@ -394,34 +394,36 @@ function API:registerModule(category, moduleData)
 end
 
 function API:registerSettings(moduleName, settingsTable)
-    -- Создаем базовую структуру если её нет
-    if not self.settings[moduleName] then
-        self.settings[moduleName] = {settings = {}}
+    -- Находим модуль для получения его callback
+    local moduleData = nil
+    for category, modules in pairs(self.modules) do
+        for _, module in ipairs(modules) do
+            if module.name == moduleName then
+                moduleData = module
+                break
+            end
+        end
+        if moduleData then break end
     end
     
-    -- Добавляем переключатель Enabled в начало списка настроек
+    -- Создаем переключатель Enabled с правильным callback
     local enabledToggle = {
         name = "Enabled",
         type = "toggle",
-        default = false,
+        default = moduleData and moduleData.enabled or false,
         callback = function(value)
-            -- Находим модуль и обновляем его состояние
-            for category, modules in pairs(self.modules) do
-                for _, module in ipairs(modules) do
-                    if module.name == moduleName then
-                        module.enabled = value
-                        saveModuleState(moduleName, value)
-                        if module.callback then
-                            pcall(module.callback, value)
-                        end
-                        break
-                    end
+            if moduleData then
+                moduleData.enabled = value
+                self.savedModuleStates[moduleName] = value
+                saveSettings()
+                if moduleData.callback then
+                    pcall(moduleData.callback, value)
                 end
             end
         end
     }
     
-    -- Объединяем настройки: сначала Enabled, потом пользовательские
+    -- Объединяем настройки
     local allSettings = {enabledToggle}
     for _, setting in ipairs(settingsTable) do
         table.insert(allSettings, setting)
@@ -429,7 +431,7 @@ function API:registerSettings(moduleName, settingsTable)
     
     self.settings[moduleName] = {settings = allSettings}
     
-    -- Загружаем сохраненные значения ТОЛЬКО ОДИН РАЗ
+    -- Загружаем сохраненные значения
     if self.savedSettings[moduleName] then
         for _, setting in ipairs(allSettings) do
             if self.savedSettings[moduleName][setting.name] ~= nil then
@@ -438,9 +440,12 @@ function API:registerSettings(moduleName, settingsTable)
         end
     end
     
-    -- Загружаем сохраненное состояние модуля для переключателя Enabled
+    -- Загружаем состояние модуля
     if self.savedModuleStates[moduleName] ~= nil then
         enabledToggle.default = self.savedModuleStates[moduleName]
+        if moduleData then
+            moduleData.enabled = self.savedModuleStates[moduleName]
+        end
     end
 end
 
@@ -539,17 +544,31 @@ local function createScrollableContainer(parent, size, position, padding)
     layout.Padding = padding
     layout.Parent = container
     
-    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
-        
-        local visibleRatio = scrollFrame.AbsoluteWindowSize.Y / scrollFrame.CanvasSize.Y
-        scrollBarFill.Size = UDim2.new(1, 0, visibleRatio, 0)
-    end)
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
     
-    scrollFrame:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
-        local positionRatio = scrollFrame.CanvasPosition.Y / (scrollFrame.CanvasSize.Y - scrollFrame.AbsoluteWindowSize.Y)
+    -- ИСПРАВЛЕНИЕ: проверяем деление на ноль
+    local canvasY = scrollFrame.CanvasSize.Y.Offset
+    if canvasY > 0 then
+        local visibleRatio = scrollFrame.AbsoluteWindowSize.Y / canvasY
+        scrollBarFill.Size = UDim2.new(1, 0, math.min(visibleRatio, 1), 0)
+    else
+        scrollBarFill.Size = UDim2.new(1, 0, 1, 0)
+    end
+end)
+    
+scrollFrame:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+    -- ИСПРАВЛЕНИЕ: проверяем деление на ноль
+    local canvasY = scrollFrame.CanvasSize.Y.Offset
+    local windowY = scrollFrame.AbsoluteWindowSize.Y
+    
+    if canvasY > windowY then
+        local positionRatio = scrollFrame.CanvasPosition.Y / (canvasY - windowY)
         scrollBarFill.Position = UDim2.new(0, 0, positionRatio * (1 - scrollBarFill.Size.Y.Scale), 0)
-    end)
+    else
+        scrollBarFill.Position = UDim2.new(0, 0, 0, 0)
+    end
+end)
     
     scrollFrame.MouseEnter:Connect(function()
         tweenTransparency(scrollBar, "Transparency", 0.5)
