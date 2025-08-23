@@ -1009,7 +1009,6 @@ end
 
 local function showModuleSettings(moduleName)
     clearSettingsContainer()
-    -- УБИРАЕМ ЭТУ СТРОКУ: API:loadSettings()
     
     local settingsContainer = _G.mainFrame:FindFirstChild("SettingsContainer")
     if not settingsContainer then return end
@@ -1017,6 +1016,53 @@ local function showModuleSettings(moduleName)
     local settings = API.settings[moduleName] or moduleSettings[moduleName]
     if not settings or not settings.settings or #settings.settings == 0 then
         return
+    end
+    
+    -- Загружаем сохраненные значения перед созданием элементов
+    if API.savedSettings[moduleName] then
+        for _, setting in ipairs(settings.settings) do
+            if API.savedSettings[moduleName][setting.name] ~= nil then
+                setting.default = API.savedSettings[moduleName][setting.name]
+            end
+            
+            -- Проверяем что все значения для слайдера не nil
+            if setting.type == "slider" then
+                setting.min = setting.min or 0
+                setting.max = setting.max or 100
+                setting.default = setting.default or setting.min or 0
+            elseif setting.type == "toggle" then
+                setting.default = setting.default or false
+            elseif setting.type == "textfield" then
+                setting.default = setting.default or ""
+            elseif setting.type == "dropdown" then
+                setting.default = setting.default or (setting.options and setting.options[1] or "")
+            end
+        end
+    else
+        -- Если нет сохраненных настроек, проверяем значения по умолчанию
+        for _, setting in ipairs(settings.settings) do
+            if setting.type == "slider" then
+                setting.min = setting.min or 0
+                setting.max = setting.max or 100
+                setting.default = setting.default or setting.min or 0
+            elseif setting.type == "toggle" then
+                setting.default = setting.default or false
+            elseif setting.type == "textfield" then
+                setting.default = setting.default or ""
+            elseif setting.type == "dropdown" then
+                setting.default = setting.default or (setting.options and setting.options[1] or "")
+            end
+        end
+    end
+    
+    -- Загружаем состояние модуля для переключателя Enabled
+    if API.savedModuleStates[moduleName] ~= nil then
+        for _, setting in ipairs(settings.settings) do
+            if setting.name == "Enabled" then
+                setting.default = API.savedModuleStates[moduleName]
+                break
+            end
+        end
     end
     
     settingsContainer.BackgroundTransparency = 0
