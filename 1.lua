@@ -715,7 +715,7 @@ local function createTextField(parent, setting, position)
 
     local textBoxBackground = Instance.new("Frame")
     textBoxBackground.Size = UDim2.new(0, 120, 0, 30)
-    textBoxBackground.Position = UDim2.new(0.6, 315, 0.5, -15)  -- Исправлена позиция
+    textBoxBackground.Position = UDim2.new(0.6, 312, 0.5, -15)  -- Исправлена позиция
     textBoxBackground.BackgroundColor3 = Color3.fromRGB(40, 40, 40)  -- Изменен цвет
     textBoxBackground.BorderSizePixel = 0
     textBoxBackground.ClipsDescendants = true 
@@ -956,7 +956,7 @@ local function createToggle(parent, setting, position)
 
     local switchTrack = Instance.new("Frame")
     switchTrack.Size = UDim2.new(0, 40, 0, 20)
-    switchTrack.Position = UDim2.new(0.6, 355, 0.5, -10)
+    switchTrack.Position = UDim2.new(0.6, 370, 0.5, -10)
     switchTrack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     switchTrack.BorderSizePixel = 0
     switchTrack.Parent = outerFrame
