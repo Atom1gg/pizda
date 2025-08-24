@@ -1173,29 +1173,40 @@ local function createModuleButton(parent, moduleData, categoryName)
     clickDetector.ZIndex = 10
     clickDetector.Parent = moduleButton
 
-    -- ФИКС: Подсветка только если модуль активный
-    local isActiveModule = (moduleSystem.activeCategory == categoryName and moduleSystem.activeModuleName == moduleData.name)
-    
-    if isActiveModule then
-        moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
-        moduleName.TextColor3 = Color3.fromRGB(255, 75, 75)
-        activeLine.Size = UDim2.new(0, 2, 1, -20)
-        activeLine.Transparency = 0
+    -- Функция проверки активности (вызывается при каждом взаимодействии)
+    local function isThisModuleActive()
+        return moduleSystem.activeCategory == categoryName and moduleSystem.activeModuleName == moduleData.name
     end
 
-    -- ФИКС: Ховер эффекты только для неактивных модулей
+    -- Функция обновления внешнего вида
+    local function updateAppearance()
+        local active = isThisModuleActive()
+        if active then
+            moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
+            moduleName.TextColor3 = Color3.fromRGB(255, 75, 75)
+            activeLine.Size = UDim2.new(0, 2, 1, -20)
+            activeLine.Transparency = 0
+        else
+            moduleButton.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+            moduleName.TextColor3 = Color3.fromRGB(150, 153, 163)
+            activeLine.Transparency = 1
+            activeLine.Size = UDim2.new(0, 2, 0, 0)
+        end
+    end
+
+    -- Изначальная настройка
+    updateAppearance()
+
+    -- Hover эффекты
     clickDetector.MouseEnter:Connect(function()
-        if not isActiveModule then
+        if not isThisModuleActive() then
             tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(20, 20, 22), 0.15)
             tweenColor(moduleName, "TextColor3", Color3.fromRGB(180, 183, 193), 0.15)
         end
     end)
 
     clickDetector.MouseLeave:Connect(function()
-        if not isActiveModule then
-            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17), 0.15)
-            tweenColor(moduleName, "TextColor3", Color3.fromRGB(150, 153, 163), 0.15)
-        end
+        updateAppearance() -- Восстанавливаем правильный вид
     end)
 
     -- Клик → выбор модуля
@@ -1204,28 +1215,15 @@ local function createModuleButton(parent, moduleData, categoryName)
         moduleSystem.activeModuleName = moduleData.name
         moduleSystem.activeCategory = categoryName
         
-        -- Сбрасываем подсветку у других модулей
+        -- Обновляем все кнопки модулей
         for _, otherButton in pairs(parent:GetChildren()) do
-            if otherButton:IsA("Frame") and otherButton ~= moduleButton then
-                local otherLine = otherButton:FindFirstChild("Frame")
-                local otherText = otherButton:FindFirstChild("TextLabel")
-                tweenTransparency(otherLine, "Transparency", 1)
-                tweenSize(otherLine, "Size", UDim2.new(0, 2, 0, 0))
-                if otherText then
-                    tweenColor(otherText, "TextColor3", Color3.fromRGB(150, 153, 163))
+            if otherButton:IsA("Frame") then
+                local otherClickDetector = otherButton:FindFirstChild("TextButton")
+                if otherClickDetector then
+                    otherClickDetector.MouseLeave:Fire() -- Принудительно вызываем MouseLeave
                 end
-                tweenColor(otherButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
             end
         end
-
-        -- Подсвечиваем активный
-        tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
-        tweenColor(moduleName, "TextColor3", Color3.fromRGB(255, 75, 75))
-        activeLine.Transparency = 0
-        tweenSize(activeLine, "Size", UDim2.new(0, 2, 1, -20))
-
-        -- Обновляем флаг активного модуля
-        isActiveModule = true
 
         -- Показываем настройки
         slashLabel.Visible = true
@@ -1245,32 +1243,32 @@ local function updateModuleList(moduleFrame, categoryName)
 
     local categoryModules = API.modules[categoryName] or moduleSystem.modules[categoryName]
     if categoryModules then
+        -- ФИКС: Восстанавливаем последний выбранный модуль ИЛИ выбираем первый
+        local moduleToSelect = nil
+        
+        -- Проверяем, есть ли сохраненный выбор для этой категории
+        if moduleSystem.activeCategory == categoryName and moduleSystem.activeModuleName then
+            for _, moduleData in ipairs(categoryModules) do
+                if moduleData.name == moduleSystem.activeModuleName then
+                    moduleToSelect = moduleData
+                    break
+                end
+            end
+        end
+        
+        -- Если нет сохраненного выбора - берем первый модуль
+        if not moduleToSelect and #categoryModules > 0 then
+            moduleToSelect = categoryModules[1]
+            moduleSystem.activeModuleName = moduleToSelect.name
+        end
+
         for index, moduleData in ipairs(categoryModules) do
-            -- ФИКС: Передаем categoryName
             local moduleButton = createModuleButton(moduleFrame, moduleData, categoryName)
             moduleButton:SetAttribute("ModuleIndex", index)
             moduleButton.Parent = moduleFrame
 
-            -- Автовыбор первого модуля если категория новая
-            if index == 1 and moduleSystem.activeCategory == categoryName and not moduleSystem.activeModuleName then
-                moduleSystem.activeModuleName = moduleData.name
-            end
-
-            -- Восстанавливаем подсветку активного модуля
-            if moduleSystem.activeCategory == categoryName and moduleSystem.activeModuleName == moduleData.name then
-                local activeLine = moduleButton:FindFirstChild("Frame")
-                local moduleName = moduleButton:FindFirstChild("TextLabel")
-
-                moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
-                if activeLine then 
-                    activeLine.Transparency = 0
-                    activeLine.Size = UDim2.new(0, 2, 1, -20)
-                end
-                if moduleName then 
-                    moduleName.TextColor3 = Color3.fromRGB(255, 75, 75) 
-                end
-
-                -- Показываем настройки
+            -- Если это выбранный модуль - показываем его настройки
+            if moduleData == moduleToSelect then
                 slashLabel.Visible = true
                 moduleNameLabel.Text = moduleData.name
                 showModuleSettings(moduleData.name)
@@ -1278,6 +1276,7 @@ local function updateModuleList(moduleFrame, categoryName)
         end
     end
 end
+
 -- Улучшенная функция для переключения видимости GUI
 local function toggleGUI()
     if not _G.keySystemPassed or not _G.mainFrame then return end
@@ -1508,7 +1507,7 @@ function createMainUI()
     UmbrellaIcon.Image = "http://www.roblox.com/asset/?id=95285379105237"
     UmbrellaIcon.Parent = mainFrame
     
-    local function addCategory(icon, name)
+local function addCategory(icon, name)
     local categoryButton = Instance.new("Frame")
     categoryButton.Size = UDim2.new(0, 50, 0, 50)
     categoryButton.Position = UDim2.new(0, 5, 0, 5)
@@ -1573,9 +1572,6 @@ function createMainUI()
 
         activeCategory = categoryButton
         moduleSystem.activeCategory = name
-        
-        -- ФИКС: Сбрасываем активный модуль при смене категории
-        moduleSystem.activeModuleName = nil
 
         tweenColor(categoryButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
         tweenColor(iconImage, "ImageColor3", Color3.fromRGB(255, 75, 75))
