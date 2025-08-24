@@ -70,6 +70,21 @@ local function saveSettings()
     end
 end
 
+local function applyModuleSettings(moduleName)
+    -- Применяем все сохраненные настройки модуля (кроме Enabled)
+    if API.settings[moduleName] and API.savedSettings[moduleName] then
+        for _, setting in ipairs(API.settings[moduleName].settings) do
+            if setting.name ~= "Enabled" and setting.callback then
+                local savedValue = API.savedSettings[moduleName][setting.name]
+                if savedValue ~= nil then
+                    pcall(setting.callback, savedValue)
+                    print("Применена настройка", setting.name, "=", savedValue, "для модуля", moduleName)
+                end
+            end
+        end
+    end
+end
+
 local function loadSettings()
     local success, result = pcall(function()
         local filePath = getPlayerDataPath()
@@ -1024,9 +1039,15 @@ function API:loadSettings()
             for _, module in ipairs(modules) do
                 if module.name == moduleName then
                     module.enabled = enabled
-                    -- Автоматически включаем модуль если он был включен
-                    if enabled and module.callback then
-                        pcall(module.callback, true)
+                    
+                    -- ДОБАВЛЕНО: Применяем настройки ПЕРЕД включением модуля
+                    if enabled then
+                        applyModuleSettings(moduleName)
+                        
+                        -- Затем включаем модуль
+                        if module.callback then
+                            pcall(module.callback, true)
+                        end
                     end
                     break
                 end
@@ -1035,12 +1056,13 @@ function API:loadSettings()
     end
     
     -- Применяем сохраненные настройки ТОЛЬКО при загрузке, БЕЗ вызова callback'ов
+    -- (они уже вызваны выше для включенных модулей)
     for moduleName, settings in pairs(self.settings) do
         if self.savedSettings[moduleName] then
             for _, setting in ipairs(settings.settings) do
                 if self.savedSettings[moduleName][setting.name] ~= nil then
                     setting.default = self.savedSettings[moduleName][setting.name]
-                    -- НЕ ВЫЗЫВАЕМ callback здесь!
+                    -- НЕ ВЫЗЫВАЕМ callback здесь для выключенных модулей
                 end
             end
         end
