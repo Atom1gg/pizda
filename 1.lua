@@ -761,16 +761,17 @@ local function createTextField(parent, setting, position)
 
     local textBoxBackground = Instance.new("Frame")
     textBoxBackground.Size = UDim2.new(0, 120, 0, 30)
-    textBoxBackground.Position = UDim2.new(0.7, 280, 0.5, -15)
-    textBoxBackground.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
+    textBoxBackground.Position = UDim2.new(0.6, 10, 0.5, -15)  -- Исправлена позиция
+    textBoxBackground.BackgroundColor3 = Color3.fromRGB(40, 40, 40)  -- Изменен цвет
     textBoxBackground.BorderSizePixel = 0
+    textBoxBackground.ClipsDescendants = true  -- ДОБАВЛЕНО: обрезает содержимое
     textBoxBackground.Parent = frame
 
     local textBoxCorner = Instance.new("UICorner")
     textBoxCorner.CornerRadius = UDim.new(0, 4)
     textBoxCorner.Parent = textBoxBackground
 
-    -- ИСПРАВЛЕНО: Загружаем сохраненное значение
+    -- Загружаем сохраненное значение
     local currentValue = setting.default or ""
     if API.savedSettings[setting.moduleName] and API.savedSettings[setting.moduleName][setting.name] ~= nil then
         currentValue = API.savedSettings[setting.moduleName][setting.name]
@@ -787,10 +788,21 @@ local function createTextField(parent, setting, position)
     textBox.TextXAlignment = Enum.TextXAlignment.Left
     textBox.PlaceholderText = setting.placeholder or ""
     textBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
+    textBox.TextTruncate = Enum.TextTruncate.AtEnd  -- ДОБАВЛЕНО: обрезает текст с троеточием
     textBox.Parent = textBoxBackground
 
+    -- ДОБАВЛЕНО: Градиент для плавного исчезновения текста справа
+    local textGradient = Instance.new("UIGradient")
+    textGradient.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0),      -- Полностью видимый слева
+        NumberSequenceKeypoint.new(0.8, 0),   -- Видимый до 80%
+        NumberSequenceKeypoint.new(1, 0.7)    -- Плавное исчезновение справа
+    })
+    textGradient.Rotation = 0  -- Горизонтальный градиент
+    textGradient.Parent = textBox
+
     local function updateValue()
-        -- ИСПРАВЛЕНО: Сохраняем изменения
+        -- Сохраняем изменения
         if not API.savedSettings[setting.moduleName] then
             API.savedSettings[setting.moduleName] = {}
         end
@@ -803,6 +815,39 @@ local function createTextField(parent, setting, position)
     end
 
     textBox.FocusLost:Connect(function()
+        updateValue()
+    end)
+
+    -- ДОБАВЛЕНО: Hover эффекты для лучшего UX
+    textBox.MouseEnter:Connect(function()
+        TweenService:Create(textBoxBackground, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        }):Play()
+    end)
+
+    textBox.MouseLeave:Connect(function()
+        if not textBox:IsFocused() then
+            TweenService:Create(textBoxBackground, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            }):Play()
+        end
+    end)
+
+    -- ДОБАВЛЕНО: Эффект при фокусе
+    textBox.Focused:Connect(function()
+        TweenService:Create(textBoxBackground, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+        }):Play()
+        -- Убираем градиент при редактировании для лучшей видимости
+        textGradient.Enabled = false
+    end)
+
+    textBox.FocusLost:Connect(function()
+        TweenService:Create(textBoxBackground, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        }):Play()
+        -- Возвращаем градиент
+        textGradient.Enabled = true
         updateValue()
     end)
 
