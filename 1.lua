@@ -951,12 +951,12 @@ local function createToggle(parent, setting, position)
     enableLabel.BackgroundTransparency = 1
     enableLabel.Parent = outerFrame
 
-local switchTrack = Instance.new("Frame")
-switchTrack.Size = UDim2.new(0, 40, 0, 20)
-switchTrack.Position = UDim2.new(1, -50, 0.5, -10) -- ИСПРАВЛЕНО: перемещено вправо
-switchTrack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-switchTrack.BorderSizePixel = 0
-switchTrack.Parent = outerFrame
+    local switchTrack = Instance.new("Frame")
+    switchTrack.Size = UDim2.new(0, 40, 0, 20)
+    switchTrack.Position = UDim2.new(0.6, -50, 0.5, -10)
+    switchTrack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    switchTrack.BorderSizePixel = 0
+    switchTrack.Parent = outerFrame
 
     local trackCorner = Instance.new("UICorner")
     trackCorner.CornerRadius = UDim.new(1, 0)
