@@ -1342,52 +1342,6 @@ local function createToggleButton()
     end)
 end
 
-btnConfirm.MouseButton1Click:Connect(function()
-    if _G.keySystemProcessing == true then return end
-    
-    if keyInput.Text == "UmbrellaHub2025" then
-        _G.keySystemProcessing = true  -- Блокируем повторные нажатия
-        
-        showNotification("Key Valid, Loading...", Color3.fromRGB(100, 255, 100))
-        
-        task.wait(1)
-        TweenService:Create(mainFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
-        
-        for _, child in pairs(mainFrame:GetChildren()) do
-            if child:IsA("GuiObject") then
-                TweenService:Create(child, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
-                if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
-                    TweenService:Create(child, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
-                elseif child:IsA("ImageLabel") then
-                    TweenService:Create(child, TweenInfo.new(0.5), {ImageTransparency = 1}):Play()
-                end
-            end
-        end
-        
-        task.wait(0.5)
-        stopIconLoop()
-        mainFrame:Destroy()
-        
-        task.wait(2.5)
-        if gui and gui.Parent then
-            gui:Destroy()
-        end
-        
-        -- Устанавливаем флаги
-        _G.keySystemPassed = true
-        _G.keySystemProcessing = false  -- Разблокируем только после полного завершения
-        
-        -- Запускаем основной UI только если он еще не создан
-        if not _G.mainUICreated then
-            createMainUI()
-        end
-        
-    else
-        showNotification("Invalid key", ACCENT_COLOR)
-        keyInput.Text = ""
-    end
-end)
-
 function createMainUI()
     if _G.mainUICreated then return end
 
