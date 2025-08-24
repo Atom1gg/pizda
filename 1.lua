@@ -354,48 +354,46 @@ local function createKeySystem()
     end)
 
     btnConfirm.MouseButton1Click:Connect(function()
-        if keyInput.Text == "UmbrellaHub2025" then
-            showNotification("Access granted! Loading...", Color3.fromRGB(100, 255, 100))
-            
-            task.wait(1)
-            TweenService:Create(mainFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
-            
-            for _, child in pairs(mainFrame:GetChildren()) do
-                if child:IsA("GuiObject") then
-                    TweenService:Create(child, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
-                    if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
-                        TweenService:Create(child, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
-                    elseif child:IsA("ImageLabel") then
-                        TweenService:Create(child, TweenInfo.new(0.5), {ImageTransparency = 1}):Play()
-                    end
+    if _G.keySystemProcessing then return end  -- Защита от множественных нажатий
+    
+    if keyInput.Text == "UmbrellaHub2025" then
+        _G.keySystemProcessing = true  -- Блокируем повторные нажатия
+        
+        showNotification("Valid key! Loading...", Color3.fromRGB(100, 255, 100))
+        
+        task.wait(1)
+        local tweenOut = TweenService:Create(mainFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1})
+        tweenOut:Play()
+        
+        for _, child in pairs(mainFrame:GetChildren()) do
+            if child:IsA("GuiObject") then
+                TweenService:Create(child, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
+                if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
+                    TweenService:Create(child, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
+                elseif child:IsA("ImageLabel") then
+                    TweenService:Create(child, TweenInfo.new(0.5), {ImageTransparency = 1}):Play()
                 end
             end
-            
-            task.wait(0.5)
-            stopIconLoop()
-            mainFrame:Destroy()
-            
-            task.wait(2.5)
-            if gui and gui.Parent then
-                gui:Destroy()
-            end
-            
-            -- Устанавливаем флаг что ключ пройден и запускаем основной UI
-            _G.keySystemPassed = true
-            createMainUI()
-            
-        else
-            showNotification("Invalid key! Try again.", ACCENT_COLOR)
-            keyInput.Text = ""
         end
-    end)
-
-    gui.AncestryChanged:Connect(function()
-        if not gui.Parent then
-            stopIconLoop()
-        end
-    end)
-end
+        
+        task.wait(0.5)
+        stopIconLoop() -- эта функция уже есть в коде
+        
+        task.wait(2.5)
+        gui:Destroy() -- используем локальную переменную gui из функции createKeySystem
+        
+        -- Устанавливаем флаги
+        _G.keySystemPassed = true
+        _G.keySystemProcessing = false
+        
+        -- Запускаем основной UI
+        createMainUI()
+        
+    else
+        showNotification("Invalid key! Try again.", ACCENT_COLOR)
+        keyInput.Text = ""
+    end
+end)
 
 function API:registerModule(category, moduleData)
     self.modules[category] = self.modules[category] or {}
