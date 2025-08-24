@@ -81,7 +81,6 @@ local function applyModuleSettings(moduleName)
                 local savedValue = API.savedSettings[moduleName][setting.name]
                 if savedValue ~= nil then
                     pcall(setting.callback, savedValue)
-                    print("Применена настройка", setting.name, "=", savedValue, "для модуля", moduleName)
                 end
             end
         end
