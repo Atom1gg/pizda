@@ -354,16 +354,11 @@ local function createKeySystem()
     end)
 
 btnConfirm.MouseButton1Click:Connect(function()
-        if _G.keySystemProcessing == true then return end
-        
         if keyInput.Text == "UmbrellaHub2025" then
-            _G.keySystemProcessing = true
-            
-            showNotification("Valid key! Loading...", Color3.fromRGB(100, 255, 100))
+            showNotification("Access granted! Loading...", Color3.fromRGB(100, 255, 100))
             
             task.wait(1)
-            local tweenOut = TweenService:Create(mainFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1})
-            tweenOut:Play()
+            TweenService:Create(mainFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
             
             for _, child in pairs(mainFrame:GetChildren()) do
                 if child:IsA("GuiObject") then
@@ -378,26 +373,28 @@ btnConfirm.MouseButton1Click:Connect(function()
             
             task.wait(0.5)
             stopIconLoop()
+            mainFrame:Destroy()
             
             task.wait(2.5)
-            gui:Destroy()  -- Теперь gui доступна здесь
-            
-            -- Устанавливаем флаги
-            _G.keySystemPassed = true
-            _G.keySystemProcessing = false
-            
-            -- Запускаем основной UI
-            if not _G.mainUICreated then
-                createMainUI()
+            if gui and gui.Parent then
+                gui:Destroy()
             end
+            
+            -- Устанавливаем флаг что ключ пройден и запускаем основной UI
+            _G.keySystemPassed = true
+            createMainUI()
             
         else
             showNotification("Invalid key! Try again.", ACCENT_COLOR)
             keyInput.Text = ""
         end
     end)
-    
-    return gui -- Возвращаем gui если нужно
+
+    gui.AncestryChanged:Connect(function()
+        if not gui.Parent then
+            stopIconLoop()
+        end
+    end)
 end
 
 function API:registerModule(category, moduleData)
