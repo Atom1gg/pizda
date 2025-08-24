@@ -354,7 +354,6 @@ local function createKeySystem()
     end)
 
 tnConfirm.MouseButton1Click:Connect(function()
-    if _G.keySystemProcessing == true then return end
     
     if keyInput.Text == "UmbrellaHub2025" then
         _G.keySystemProcessing = true  -- Блокируем повторные нажатия
