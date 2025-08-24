@@ -353,7 +353,7 @@ local function createKeySystem()
         TweenService:Create(btnConfirm, TweenInfo.new(0.2), {BackgroundColor3 = ACCENT_COLOR}):Play()
     end)
 
-tnConfirm.MouseButton1Click:Connect(function()
+btnConfirm.MouseButton1Click:Connect(function()
     
     if keyInput.Text == "UmbrellaHub2025" then
         _G.keySystemProcessing = true  -- Блокируем повторные нажатия
