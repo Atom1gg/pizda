@@ -955,7 +955,7 @@ local function createToggle(parent, setting, position)
 
     local switchTrack = Instance.new("Frame")
     switchTrack.Size = UDim2.new(0, 40, 0, 20)
-    switchTrack.Position = UDim2.new(0.6, 387, 0.5, -10)
+    switchTrack.Position = UDim2.new(0.6, 370, 0.5, -10)
     switchTrack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     switchTrack.BorderSizePixel = 0
     switchTrack.Parent = outerFrame
@@ -1126,7 +1126,7 @@ local function showModuleSettings(moduleName)
     end
 end
 
-local function createModuleButton(parent, moduleData, categoryName)
+local function createModuleButton(parent, moduleData)
     local moduleButton = Instance.new("Frame")
     moduleButton.Size = UDim2.new(1, -20, 0, 40)
     moduleButton.Position = UDim2.new(0, 10, 0, 0)
@@ -1173,61 +1173,56 @@ local function createModuleButton(parent, moduleData, categoryName)
     clickDetector.ZIndex = 10
     clickDetector.Parent = moduleButton
 
-    -- Функция проверки активности (вызывается при каждом взаимодействии)
-    local function isThisModuleActive()
-        return moduleSystem.activeCategory == categoryName and moduleSystem.activeModuleName == moduleData.name
+    -- Подсветка если модуль уже включен
+    if moduleData.enabled then
+        moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
+        moduleName.TextColor3 = Color3.fromRGB(255, 75, 75)
+        activeLine.Size = UDim2.new(0, 2, 1, -20)
+        activeLine.Transparency = 0
     end
-
-    -- Функция обновления внешнего вида
-    local function updateAppearance()
-        local active = isThisModuleActive()
-        if active then
-            moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
-            moduleName.TextColor3 = Color3.fromRGB(255, 75, 75)
-            activeLine.Size = UDim2.new(0, 2, 1, -20)
-            activeLine.Transparency = 0
-        else
-            moduleButton.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-            moduleName.TextColor3 = Color3.fromRGB(150, 153, 163)
-            activeLine.Transparency = 1
-            activeLine.Size = UDim2.new(0, 2, 0, 0)
-        end
-    end
-
-    -- Изначальная настройка
-    updateAppearance()
 
     -- Hover эффекты
     clickDetector.MouseEnter:Connect(function()
-        if not isThisModuleActive() then
-            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(20, 20, 22), 0.15)
-            tweenColor(moduleName, "TextColor3", Color3.fromRGB(180, 183, 193), 0.15)
-        end
+        tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(20, 20, 22), 0.15)
+        tweenColor(moduleName, "TextColor3", Color3.fromRGB(180, 183, 193), 0.15)
     end)
 
     clickDetector.MouseLeave:Connect(function()
-        updateAppearance() -- Восстанавливаем правильный вид
+        if not moduleData.enabled then
+            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17), 0.15)
+            tweenColor(moduleName, "TextColor3", Color3.fromRGB(150, 153, 163), 0.15)
+        else
+            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30), 0.15)
+            tweenColor(moduleName, "TextColor3", Color3.fromRGB(255, 75, 75), 0.15)
+        end
     end)
 
-    -- Клик → выбор модуля
+    -- Клик → выбор модуля (но НЕ переключение enabled!)
     clickDetector.MouseButton1Click:Connect(function()
-        -- Сохраняем активный модуль
-        moduleSystem.activeModuleName = moduleData.name
-        moduleSystem.activeCategory = categoryName
-        
-        -- Обновляем все кнопки модулей
+        -- сбрасываем подсветку у других
         for _, otherButton in pairs(parent:GetChildren()) do
-            if otherButton:IsA("Frame") then
-                local otherClickDetector = otherButton:FindFirstChild("TextButton")
-                if otherClickDetector then
-                    otherClickDetector.MouseLeave:Fire() -- Принудительно вызываем MouseLeave
+            if otherButton:IsA("Frame") and otherButton ~= moduleButton then
+                local otherLine = otherButton:FindFirstChild("Frame")
+                local otherText = otherButton:FindFirstChild("TextLabel")
+                tweenTransparency(otherLine, "Transparency", 1)
+                tweenSize(otherLine, "Size", UDim2.new(0, 2, 0, 0))
+                if otherText then
+                    tweenColor(otherText, "TextColor3", Color3.fromRGB(150, 153, 163))
                 end
+                tweenColor(otherButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
             end
         end
 
-        -- Показываем настройки
+        -- подсветка активного
+        tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
+        tweenColor(moduleName, "TextColor3", Color3.fromRGB(255, 75, 75))
+        activeLine.Transparency = 0
+        tweenSize(activeLine, "Size", UDim2.new(0, 2, 1, -20))
+
+        -- показать настройки
         slashLabel.Visible = true
         moduleNameLabel.Text = moduleData.name
+        moduleSystem.activeModuleName = moduleData.name
         showModuleSettings(moduleData.name)
     end)
 
@@ -1243,35 +1238,31 @@ local function updateModuleList(moduleFrame, categoryName)
 
     local categoryModules = API.modules[categoryName] or moduleSystem.modules[categoryName]
     if categoryModules then
-        -- ФИКС: Восстанавливаем последний выбранный модуль ИЛИ выбираем первый
-        local moduleToSelect = nil
-        
-        -- Проверяем, есть ли сохраненный выбор для этой категории
-        if moduleSystem.activeCategory == categoryName and moduleSystem.activeModuleName then
-            for _, moduleData in ipairs(categoryModules) do
-                if moduleData.name == moduleSystem.activeModuleName then
-                    moduleToSelect = moduleData
-                    break
-                end
-            end
-        end
-        
-        -- Если нет сохраненного выбора - берем первый модуль
-        if not moduleToSelect and #categoryModules > 0 then
-            moduleToSelect = categoryModules[1]
-            moduleSystem.activeModuleName = moduleToSelect.name
-        end
-
         for index, moduleData in ipairs(categoryModules) do
-            local moduleButton = createModuleButton(moduleFrame, moduleData, categoryName)
+            local moduleButton = createModuleButton(moduleFrame, moduleData)
             moduleButton:SetAttribute("ModuleIndex", index)
             moduleButton.Parent = moduleFrame
 
-            -- Если это выбранный модуль - показываем его настройки
-            if moduleData == moduleToSelect then
+            if moduleData.enabled then
+                local activeLine = moduleButton:FindFirstChild("Frame")
+                local moduleName = moduleButton:FindFirstChild("TextLabel")
+
+                moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
+                if activeLine then 
+                    activeLine.Transparency = 0
+                    activeLine.Size = UDim2.new(0, 2, 1, -20)
+                end
+                if moduleName then moduleName.TextColor3 = Color3.fromRGB(255, 75, 75) end
+
                 slashLabel.Visible = true
                 moduleNameLabel.Text = moduleData.name
+                moduleNameLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
+                moduleSystem.activeModuleName = moduleData.name
                 showModuleSettings(moduleData.name)
+                
+                if API.callbacks[moduleData.name] and API.callbacks[moduleData.name].onEnable then
+                    pcall(API.callbacks[moduleData.name].onEnable)
+                end
             end
         end
     end
@@ -1507,86 +1498,86 @@ function createMainUI()
     UmbrellaIcon.Image = "http://www.roblox.com/asset/?id=95285379105237"
     UmbrellaIcon.Parent = mainFrame
     
-local function addCategory(icon, name)
-    local categoryButton = Instance.new("Frame")
-    categoryButton.Size = UDim2.new(0, 50, 0, 50)
-    categoryButton.Position = UDim2.new(0, 5, 0, 5)
-    categoryButton.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-    categoryButton.BorderSizePixel = 0
-    categoryButton.Parent = categoryList
+    local function addCategory(icon, name)
+        local categoryButton = Instance.new("Frame")
+        categoryButton.Size = UDim2.new(0, 50, 0, 50)
+        categoryButton.Position = UDim2.new(0, 5, 0, 5)
+        categoryButton.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+        categoryButton.BorderSizePixel = 0
+        categoryButton.Parent = categoryList
 
-    local categoryCorner = Instance.new("UICorner")
-    categoryCorner.CornerRadius = UDim.new(0, 8)
-    categoryCorner.Parent = categoryButton
+        local categoryCorner = Instance.new("UICorner")
+        categoryCorner.CornerRadius = UDim.new(0, 8)
+        categoryCorner.Parent = categoryButton
 
-    local iconImage = Instance.new("ImageLabel")
-    iconImage.Size = UDim2.new(0, 30, 0, 30)
-    iconImage.Position = UDim2.new(0.5, -15, 0.5, -15)
-    iconImage.BackgroundTransparency = 1
-    iconImage.Image = icon
-    iconImage.ImageColor3 = Color3.fromRGB(150, 150, 150)
-    iconImage.Parent = categoryButton
+        local iconImage = Instance.new("ImageLabel")
+        iconImage.Size = UDim2.new(0, 30, 0, 30)
+        iconImage.Position = UDim2.new(0.5, -15, 0.5, -15)
+        iconImage.BackgroundTransparency = 1
+        iconImage.Image = icon
+        iconImage.ImageColor3 = Color3.fromRGB(150, 150, 150)
+        iconImage.Parent = categoryButton
 
-    local redLine = Instance.new("Frame")
-    redLine.Size = UDim2.new(0, 2, 0, 0)
-    redLine.Position = UDim2.new(0, 0, 0.5, 0)
-    redLine.AnchorPoint = Vector2.new(0, 0.5)
-    redLine.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
-    redLine.Transparency = 1
-    redLine.Parent = categoryButton
+        local redLine = Instance.new("Frame")
+        redLine.Size = UDim2.new(0, 2, 0, 0)
+        redLine.Position = UDim2.new(0, 0, 0.5, 0)
+        redLine.AnchorPoint = Vector2.new(0, 0.5)
+        redLine.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
+        redLine.Transparency = 1
+        redLine.Parent = categoryButton
 
-    local clickDetector = Instance.new("TextButton")
-    clickDetector.Size = UDim2.new(1, 0, 1, 0)
-    clickDetector.BackgroundTransparency = 1
-    clickDetector.Text = ""
-    clickDetector.Parent = categoryButton
+        local clickDetector = Instance.new("TextButton")
+        clickDetector.Size = UDim2.new(1, 0, 1, 0)
+        clickDetector.BackgroundTransparency = 1
+        clickDetector.Text = ""
+        clickDetector.Parent = categoryButton
 
-    clickDetector.MouseEnter:Connect(function()
-        if activeCategory ~= categoryButton then
-            tweenColor(iconImage, "ImageColor3", Color3.fromRGB(200, 200, 200), 0.15)
-        end
-    end)
-
-    clickDetector.MouseLeave:Connect(function()
-        if activeCategory ~= categoryButton then
-            tweenColor(iconImage, "ImageColor3", Color3.fromRGB(150, 150, 150), 0.15)
-        end
-    end)
-
-    clickDetector.MouseButton1Click:Connect(function()
-        if activeCategory == categoryButton then return end
-
-        if activeCategory then
-            local prevIcon = activeCategory:FindFirstChild("ImageLabel")
-            local prevLine = activeCategory:FindFirstChild("Frame")
-
-            if prevIcon then
-                tweenColor(prevIcon, "ImageColor3", Color3.fromRGB(150, 150, 150))
+        clickDetector.MouseEnter:Connect(function()
+            if activeCategory ~= categoryButton then
+                tweenColor(iconImage, "ImageColor3", Color3.fromRGB(200, 200, 200), 0.15)
             end
-            if prevLine then
-                tweenTransparency(prevLine, "Transparency", 1)
-                tweenSize(prevLine, "Size", UDim2.new(0, 2, 0, 0))
+        end)
+
+        clickDetector.MouseLeave:Connect(function()
+            if activeCategory ~= categoryButton then
+                tweenColor(iconImage, "ImageColor3", Color3.fromRGB(150, 150, 150), 0.15)
             end
-            tweenColor(activeCategory, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
-        end
+        end)
 
-        activeCategory = categoryButton
-        moduleSystem.activeCategory = name
+        clickDetector.MouseButton1Click:Connect(function()
+            if activeCategory == categoryButton then return end
 
-        tweenColor(categoryButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
-        tweenColor(iconImage, "ImageColor3", Color3.fromRGB(255, 75, 75))
+            if activeCategory then
+                local prevIcon = activeCategory:FindFirstChild("ImageLabel")
+                local prevLine = activeCategory:FindFirstChild("Frame")
 
-        redLine.Transparency = 0
-        tweenSize(redLine, "Size", UDim2.new(0, 2, 0, 20))
+                if prevIcon then
+                    tweenColor(prevIcon, "ImageColor3", Color3.fromRGB(150, 150, 150))
+                end
+                if prevLine then
+                    tweenTransparency(prevLine, "Transparency", 1)
+                    tweenSize(prevLine, "Size", UDim2.new(0, 2, 0, 0))
+                end
+                tweenColor(activeCategory, "BackgroundColor3", Color3.fromRGB(15, 15, 17))
+            end
 
-        activeCategoryLabel.Text = name
-        slashLabel.Visible = false
-        moduleNameLabel.Text = ""
-        
-        clearSettingsContainer()
-        updateModuleList(moduleList, name)
-    end)
-end
+            activeCategory = categoryButton
+            moduleSystem.activeCategory = name
+
+            tweenColor(categoryButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
+            tweenColor(iconImage, "ImageColor3", Color3.fromRGB(255, 75, 75))
+
+            redLine.Transparency = 0
+            tweenSize(redLine, "Size", UDim2.new(0, 2, 0, 20))
+
+            activeCategoryLabel.Text = name
+            slashLabel.Visible = false
+            moduleNameLabel.Text = ""
+            
+            clearSettingsContainer()
+            updateModuleList(moduleList, name)
+        end)
+    end
 
     addCategory("http://www.roblox.com/asset/?id=103577523623326", "Server")
     addCategory("http://www.roblox.com/asset/?id=136613041915472", "World")
