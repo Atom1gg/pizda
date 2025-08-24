@@ -353,7 +353,7 @@ local function createKeySystem()
         TweenService:Create(btnConfirm, TweenInfo.new(0.2), {BackgroundColor3 = ACCENT_COLOR}):Play()
     end)
 
-    btnConfirm.MouseButton1Click:Connect(function()
+tnConfirm.MouseButton1Click:Connect(function()
     if _G.keySystemProcessing then return end  -- Защита от множественных нажатий
     
     if keyInput.Text == "UmbrellaHub2025" then
@@ -377,10 +377,10 @@ local function createKeySystem()
         end
         
         task.wait(0.5)
-        stopIconLoop() -- эта функция уже есть в коде
+        stopIconLoop()
         
         task.wait(2.5)
-        gui:Destroy() -- используем локальную переменную gui из функции createKeySystem
+        gui:Destroy()
         
         -- Устанавливаем флаги
         _G.keySystemPassed = true
@@ -393,6 +393,7 @@ local function createKeySystem()
         showNotification("Invalid key! Try again.", ACCENT_COLOR)
         keyInput.Text = ""
     end
+end) -- УБРАЛ ЛИШНИЙ end)
 
 function API:registerModule(category, moduleData)
     self.modules[category] = self.modules[category] or {}
