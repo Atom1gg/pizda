@@ -393,7 +393,6 @@ local function createKeySystem()
         showNotification("Invalid key! Try again.", ACCENT_COLOR)
         keyInput.Text = ""
     end
-end)
 
 function API:registerModule(category, moduleData)
     self.modules[category] = self.modules[category] or {}
