@@ -955,7 +955,7 @@ local function createToggle(parent, setting, position)
 
     local switchTrack = Instance.new("Frame")
     switchTrack.Size = UDim2.new(0, 40, 0, 20)
-    switchTrack.Position = UDim2.new(0.6, 372, 0.5, -10)
+    switchTrack.Position = UDim2.new(0.6, 390, 0.5, -10)
     switchTrack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     switchTrack.BorderSizePixel = 0
     switchTrack.Parent = outerFrame
@@ -1477,7 +1477,7 @@ function createMainUI()
     slashLabel.Font = Enum.Font.Gotham
     slashLabel.TextColor3 = Color3.fromRGB(150, 153, 163)
     slashLabel.TextXAlignment = Enum.TextXAlignment.Left
-    slashLabel.Visible = false
+    slashLabel.Visible = true
     slashLabel.Parent = mainFrame
 
     moduleNameLabel = Instance.new("TextLabel")
