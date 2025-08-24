@@ -955,7 +955,7 @@ local function createToggle(parent, setting, position)
 
     local switchTrack = Instance.new("Frame")
     switchTrack.Size = UDim2.new(0, 40, 0, 20)
-    switchTrack.Position = UDim2.new(0.6, 385, 0.5, -10)
+    switchTrack.Position = UDim2.new(0.6, 387, 0.5, -10)
     switchTrack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     switchTrack.BorderSizePixel = 0
     switchTrack.Parent = outerFrame
@@ -1173,7 +1173,7 @@ local function createModuleButton(parent, moduleData, categoryName)
     clickDetector.ZIndex = 10
     clickDetector.Parent = moduleButton
 
-    -- ФИКС: Подсветка только если модуль активный (выбранный)
+    -- ФИКС: Подсветка только если модуль активный
     local isActiveModule = (moduleSystem.activeCategory == categoryName and moduleSystem.activeModuleName == moduleData.name)
     
     if isActiveModule then
@@ -1183,17 +1183,16 @@ local function createModuleButton(parent, moduleData, categoryName)
         activeLine.Transparency = 0
     end
 
-    -- Hover эффекты
+    -- ФИКС: Ховер эффекты только для неактивных модулей
     clickDetector.MouseEnter:Connect(function()
-        tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(20, 20, 22), 0.15)
-        tweenColor(moduleName, "TextColor3", Color3.fromRGB(180, 183, 193), 0.15)
+        if not isActiveModule then
+            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(20, 20, 22), 0.15)
+            tweenColor(moduleName, "TextColor3", Color3.fromRGB(180, 183, 193), 0.15)
+        end
     end)
 
     clickDetector.MouseLeave:Connect(function()
-        if isActiveModule then
-            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30), 0.15)
-            tweenColor(moduleName, "TextColor3", Color3.fromRGB(255, 75, 75), 0.15)
-        else
+        if not isActiveModule then
             tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17), 0.15)
             tweenColor(moduleName, "TextColor3", Color3.fromRGB(150, 153, 163), 0.15)
         end
@@ -1224,6 +1223,9 @@ local function createModuleButton(parent, moduleData, categoryName)
         tweenColor(moduleName, "TextColor3", Color3.fromRGB(255, 75, 75))
         activeLine.Transparency = 0
         tweenSize(activeLine, "Size", UDim2.new(0, 2, 1, -20))
+
+        -- Обновляем флаг активного модуля
+        isActiveModule = true
 
         -- Показываем настройки
         slashLabel.Visible = true
