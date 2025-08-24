@@ -524,31 +524,12 @@ local function createScrollableContainer(parent, size, position, padding)
     scrollFrame.Size = size
     scrollFrame.Position = position
     scrollFrame.BackgroundTransparency = 1
-    scrollFrame.ScrollBarThickness = 0
+    scrollFrame.ScrollBarThickness = 0 -- ИСПРАВЛЕНО: полностью скрываем скроллбар
     scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
     scrollFrame.Parent = parent
     
-    local scrollBar = Instance.new("Frame")
-    scrollBar.Size = UDim2.new(0, 4, 1, 0)
-    scrollBar.Position = UDim2.new(1, -4, 0, 0)
-    scrollBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    scrollBar.BorderSizePixel = 0
-    scrollBar.Transparency = 1
-    scrollBar.Parent = scrollFrame
-    
-    local scrollBarCorner = Instance.new("UICorner")
-    scrollBarCorner.CornerRadius = UDim.new(1, 0)
-    scrollBarCorner.Parent = scrollBar
-    
-    local scrollBarFill = Instance.new("Frame")
-    scrollBarFill.Size = UDim2.new(1, 0, 0, 0)
-    scrollBarFill.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    scrollBarFill.BorderSizePixel = 0
-    scrollBarFill.Parent = scrollBar
-    
-    local scrollBarFillCorner = Instance.new("UICorner")
-    scrollBarFillCorner.CornerRadius = UDim.new(1, 0)
-    scrollBarFillCorner.Parent = scrollBarFill
+    -- Убираем все элементы скроллбара
+    -- scrollBar, scrollBarFill и связанные элементы удалены
     
     local container = Instance.new("Frame")
     container.Size = UDim2.new(1, 0, 1, 0)
@@ -559,38 +540,8 @@ local function createScrollableContainer(parent, size, position, padding)
     layout.Padding = padding
     layout.Parent = container
     
-layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
-    
-    -- ИСПРАВЛЕНИЕ: проверяем деление на ноль
-    local canvasY = scrollFrame.CanvasSize.Y.Offset
-    if canvasY > 0 then
-        local visibleRatio = scrollFrame.AbsoluteWindowSize.Y / canvasY
-        scrollBarFill.Size = UDim2.new(1, 0, math.min(visibleRatio, 1), 0)
-    else
-        scrollBarFill.Size = UDim2.new(1, 0, 1, 0)
-    end
-end)
-    
-scrollFrame:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
-    -- ИСПРАВЛЕНИЕ: проверяем деление на ноль
-    local canvasY = scrollFrame.CanvasSize.Y.Offset
-    local windowY = scrollFrame.AbsoluteWindowSize.Y
-    
-    if canvasY > windowY then
-        local positionRatio = scrollFrame.CanvasPosition.Y / (canvasY - windowY)
-        scrollBarFill.Position = UDim2.new(0, 0, positionRatio * (1 - scrollBarFill.Size.Y.Scale), 0)
-    else
-        scrollBarFill.Position = UDim2.new(0, 0, 0, 0)
-    end
-end)
-    
-    scrollFrame.MouseEnter:Connect(function()
-        tweenTransparency(scrollBar, "Transparency", 0.5)
-    end)
-    
-    scrollFrame.MouseLeave:Connect(function()
-        tweenTransparency(scrollBar, "Transparency", 1)
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
     end)
     
     return scrollFrame, container
@@ -1000,12 +951,12 @@ local function createToggle(parent, setting, position)
     enableLabel.BackgroundTransparency = 1
     enableLabel.Parent = outerFrame
 
-    local switchTrack = Instance.new("Frame")
-    switchTrack.Size = UDim2.new(0, 40, 0, 20)
-    switchTrack.Position = UDim2.new(0.6, 30, 0.5, -10)
-    switchTrack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    switchTrack.BorderSizePixel = 0
-    switchTrack.Parent = outerFrame
+local switchTrack = Instance.new("Frame")
+switchTrack.Size = UDim2.new(0, 40, 0, 20)
+switchTrack.Position = UDim2.new(1, -50, 0.5, -10) -- ИСПРАВЛЕНО: перемещено вправо
+switchTrack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+switchTrack.BorderSizePixel = 0
+switchTrack.Parent = outerFrame
 
     local trackCorner = Instance.new("UICorner")
     trackCorner.CornerRadius = UDim.new(1, 0)
