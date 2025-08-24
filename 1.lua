@@ -1345,14 +1345,13 @@ local function createToggleButton()
     end)
 end
 
--- Исправленный обработчик кнопки Confirm в ключ системе
 btnConfirm.MouseButton1Click:Connect(function()
-    if _G.keySystemProcessing then return end  -- Защита от множественных нажатий
+    if _G.keySystemProcessing then return end
     
     if keyInput.Text == "UmbrellaHub2025" then
-        _G.keySystemProcessing = true 
+        _G.keySystemProcessing = true  -- Блокируем повторные нажатия
         
-        showNotification("Key valid! Loading...", Color3.fromRGB(100, 255, 100))
+        showNotification("Key Valid, Loading...", Color3.fromRGB(100, 255, 100))
         
         task.wait(1)
         TweenService:Create(mainFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
@@ -1387,7 +1386,7 @@ btnConfirm.MouseButton1Click:Connect(function()
         end
         
     else
-        showNotification("Invalid key!", ACCENT_COLOR)
+        showNotification("Invalid key", ACCENT_COLOR)
         keyInput.Text = ""
     end
 end)
