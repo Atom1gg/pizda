@@ -8,41 +8,6 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 -- ================================
--- WALKSPEED MODULE
--- ================================
-local currentSpeed = 16
-local defaultSpeed = 16
-local speedConnection
-
-local function setPlayerSpeed(speed)
-    local character = LocalPlayer.Character
-    if character then
-        local humanoid = character:FindFirstChild("Humanoid")
-        if humanoid then
-            humanoid.WalkSpeed = speed
-        end
-    end
-end
-
-local function startSpeedLoop()
-    if speedConnection then
-        speedConnection:Disconnect()
-    end
-    
-    speedConnection = RunService.Heartbeat:Connect(function()
-        setPlayerSpeed(currentSpeed)
-    end)
-end
-
-local function stopSpeedLoop()
-    if speedConnection then
-        speedConnection:Disconnect()
-        speedConnection = nil
-    end
-    setPlayerSpeed(defaultSpeed)
-end
-
--- ================================
 -- AUTO BHOP MODULE
 -- ================================
 local AutoBhopModule = {}
@@ -1013,25 +978,10 @@ end
 
 -- PLAYER MODULES
 UmbrellaHub.api:registerModule("Player", {
-    name = "Walkspeed",
-    enabled = false,
-    callback = function(enabled)
-        if enabled then
-            startSpeedLoop()
-            print("Walkspeed включен")
-        else
-            stopSpeedLoop()
-            print("Walkspeed выключен")
-        end
-    end
-})
-
-UmbrellaHub.api:registerModule("Player", {
     name = "Auto Bhop",
     enabled = false,
     callback = function(enabled)
         toggleBhop(enabled)
-        print("Auto Bhop " .. (enabled and "включен" or "выключен"))
     end
 })
 
@@ -1040,7 +990,6 @@ UmbrellaHub.api:registerModule("Player", {
     enabled = false,
     callback = function(enabled)
         toggleThirdPerson(enabled)
-        print("Third Person " .. (enabled and "включен" or "выключен"))
     end
 })
 
@@ -1050,7 +999,6 @@ UmbrellaHub.api:registerModule("Combat", {
     enabled = false,
     callback = function(enabled)
         toggleSilentAim(enabled)
-        print("Silent Aim " .. (enabled and "включен" or "выключен"))
     end
 })
 
@@ -1059,7 +1007,6 @@ UmbrellaHub.api:registerModule("Combat", {
     enabled = false,
     callback = function(enabled)
         toggleSpinBot(enabled)
-        print("Spin Bot " .. (enabled and "включен" or "выключен"))
     end
 })
 
@@ -1068,7 +1015,6 @@ UmbrellaHub.api:registerModule("Combat", {
     enabled = false,
     callback = function(enabled)
         toggleFastPlant(enabled)
-        print("Fast Plant " .. (enabled and "включен" or "выключен"))
     end
 })
 
@@ -1077,7 +1023,6 @@ UmbrellaHub.api:registerModule("Combat", {
     enabled = false,
     callback = function(enabled)
         toggleQuickDefuse(enabled)
-        print("Quick Defuse " .. (enabled and "включен" or "выключен"))
     end
 })
 
@@ -1087,7 +1032,6 @@ UmbrellaHub.api:registerModule("World", {
     enabled = false,
     callback = function(enabled)
         toggleFov(enabled)
-        print("FOV Changer " .. (enabled and "включен" or "выключен"))
     end
 })
 
@@ -1096,7 +1040,6 @@ UmbrellaHub.api:registerModule("World", {
     enabled = false,
     callback = function(enabled)
         toggleChams(enabled)
-        print("Chams " .. (enabled and "включен" or "выключен"))
     end
 })
 
@@ -1105,7 +1048,6 @@ UmbrellaHub.api:registerModule("World", {
     enabled = false,
     callback = function(enabled)
         toggleESP(enabled)
-        print("ESP " .. (enabled and "включен" or "выключен"))
     end
 })
 
@@ -1114,7 +1056,6 @@ UmbrellaHub.api:registerModule("World", {
     enabled = false,
     callback = function(enabled)
         toggleBombESP(enabled)
-        print("Bomb ESP " .. (enabled and "включен" or "выключен"))
     end
 })
 
@@ -1123,7 +1064,6 @@ UmbrellaHub.api:registerModule("World", {
     enabled = false,
     callback = function(enabled)
         toggleGrenadeTrajectory(enabled)
-        print("Grenade Trajectory " .. (enabled and "включен" or "выключен"))
     end
 })
 
@@ -1133,29 +1073,12 @@ UmbrellaHub.api:registerModule("Utility", {
     enabled = false,
     callback = function(enabled)
         toggleKillSay(enabled)
-        print("Kill Say " .. (enabled and "включен" or "выключен"))
     end
 })
 
 -- ================================
 -- SETTINGS REGISTRATION
 -- ================================
-
--- Walkspeed Settings
-UmbrellaHub.api:registerSettings("Walkspeed", {
-    {
-        name = "Speed",
-        type = "slider",
-        min = 16,
-        max = 100,
-        default = 16,
-        callback = function(value)
-            currentSpeed = value
-            print("Скорость изменена на:", value)
-        end
-    }
-})
-
 -- Auto Bhop Settings
 UmbrellaHub.api:registerSettings("Auto Bhop", {
     {
