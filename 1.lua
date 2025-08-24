@@ -712,7 +712,7 @@ local function createTextField(parent, setting, position)
 
     local textBoxBackground = Instance.new("Frame")
     textBoxBackground.Size = UDim2.new(0, 120, 0, 30)
-    textBoxBackground.Position = UDim2.new(1, -50, 0.5, -15)  -- Исправлена позиция
+    textBoxBackground.Position = UDim2.new(0.6, 50, 0.5, -15)  -- Исправлена позиция
     textBoxBackground.BackgroundColor3 = Color3.fromRGB(40, 40, 40)  -- Изменен цвет
     textBoxBackground.BorderSizePixel = 0
     textBoxBackground.ClipsDescendants = true 
