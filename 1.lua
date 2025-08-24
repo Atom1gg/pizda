@@ -1367,7 +1367,7 @@ function createMainUI()
     mainFrame.Position = UDim2.new(0.5, -450, 0.5, -300)
     mainFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
     mainFrame.BorderSizePixel = 0
-    mainFrame.Visible = false
+    mainFrame.Visible = true
     mainFrame.Parent = screenGui
 
     local mainCorner = Instance.new("UICorner")
@@ -1477,7 +1477,7 @@ function createMainUI()
     slashLabel.Font = Enum.Font.Gotham
     slashLabel.TextColor3 = Color3.fromRGB(150, 153, 163)
     slashLabel.TextXAlignment = Enum.TextXAlignment.Left
-    slashLabel.Visible = true
+    slashLabel.Visible = false
     slashLabel.Parent = mainFrame
 
     moduleNameLabel = Instance.new("TextLabel")
