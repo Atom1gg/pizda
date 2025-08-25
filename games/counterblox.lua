@@ -1600,6 +1600,19 @@ local function toggleGrenadeTrajectory(state)
         ClearTrajectory()
     end
 end
+
+-- ================================
+-- REGISTER CATEGORIES
+-- ================================
+
+UmbrellaHub.api:setCategories({
+    {name = "Server", icon = "http://www.roblox.com/asset/?id=103577523623326"},
+    {name = "World", icon = "http://www.roblox.com/asset/?id=136613041915472"},
+    {name = "Player", icon = "http://www.roblox.com/asset/?id=85568792810849"},
+    {name = "Utility", icon = "http://www.roblox.com/asset/?id=124280107087786"},
+    {name = "Combat", icon = "http://www.roblox.com/asset/?id=109730932565942"}
+})
+
 -- ================================
 -- MODULE REGISTRATION
 -- ================================
