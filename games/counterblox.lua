@@ -1150,7 +1150,6 @@ local function toggleRapidFire(state)
     end
 end
 
-
 -- ================================
 -- PENETRATION MODULE (ИСПРАВЛЕННЫЙ)
 -- ================================
@@ -1600,19 +1599,6 @@ local function toggleGrenadeTrajectory(state)
         ClearTrajectory()
     end
 end
-
--- ================================
--- REGISTER CATEGORIES
--- ================================
-
-UmbrellaHub.api:setCategories({
-    {name = "Server", icon = "http://www.roblox.com/asset/?id=103577523623326"},
-    {name = "World", icon = "http://www.roblox.com/asset/?id=136613041915472"},
-    {name = "Player", icon = "http://www.roblox.com/asset/?id=85568792810849"},
-    {name = "Utility", icon = "http://www.roblox.com/asset/?id=124280107087786"},
-    {name = "Combat", icon = "http://www.roblox.com/asset/?id=109730932565942"}
-})
-
 -- ================================
 -- MODULE REGISTRATION
 -- ================================
@@ -1643,6 +1629,24 @@ UmbrellaHub.api:registerModule("Combat", {
         toggleSilentAim(enabled)
     end
 })
+
+UmbrellaHub.api:registerModule("Combat", {
+    name = "Infinite Ammo",
+    enabled = false,
+    callback = function(enabled)
+        toggleInfiniteAmmo(enabled)
+    end
+})
+
+-- Регистрация модуля Rapid Fire
+UmbrellaHub.api:registerModule("Combat", {
+    name = "Rapid Fire",
+    enabled = false,
+    callback = function(enabled)
+        toggleRapidFire(enabled)
+    end
+})
+
 
 UmbrellaHub.api:registerModule("Combat", {
     name = "Spin Bot",
@@ -1726,52 +1730,11 @@ UmbrellaHub.api:registerModule("Combat", {
     end
 })
 
-UmbrellaHub.api:registerModule("Combat", {
-    name = "Infinite Ammo",
-    enabled = false,
-    callback = function(enabled)
-        toggleInfiniteAmmo(enabled)
-    end
-})
-
--- Регистрация модуля Rapid Fire
-UmbrellaHub.api:registerModule("Combat", {
-    name = "Rapid Fire",
-    enabled = false,
-    callback = function(enabled)
-        toggleRapidFire(enabled)
-    end
-})
-
 
 -- ================================
 -- SETTINGS REGISTRATION
 -- ================================
 
-UmbrellaHub.api:registerSettings("Penetration", {
-    {
-        name = "Max Penetration",
-        type = "slider",
-        min = 50,
-        max = 200,
-        default = 100,
-        callback = function(value)
-            PenetrationModule.maxPenetration = value
-        end
-    },
-    {
-        name = "Max Obstacles",
-        type = "slider",
-        min = 1,
-        max = 8,
-        default = 4,
-        callback = function(value)
-            PenetrationModule.maxObstacles = value
-        end
-    }
-})
-
--- Настройки Infinite Ammo
 UmbrellaHub.api:registerSettings("Infinite Ammo", {
     {
         name = "Primary Ammo",
@@ -1806,6 +1769,29 @@ UmbrellaHub.api:registerSettings("Rapid Fire", {
         isPercentage = false,
         callback = function(value)
             RapidFireModule.fireRateMultiplier = value
+        end
+    }
+})
+
+UmbrellaHub.api:registerSettings("Penetration", {
+    {
+        name = "Max Penetration",
+        type = "slider",
+        min = 50,
+        max = 200,
+        default = 100,
+        callback = function(value)
+            PenetrationModule.maxPenetration = value
+        end
+    },
+    {
+        name = "Max Obstacles",
+        type = "slider",
+        min = 1,
+        max = 8,
+        default = 4,
+        callback = function(value)
+            PenetrationModule.maxObstacles = value
         end
     }
 })
