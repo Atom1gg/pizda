@@ -33,6 +33,7 @@ local API = {
     callbacks = {},
     savedSettings = {},
     savedModuleStates = {}
+    categories = {}
 }
 
 local function closeAllDropdowns(except)
@@ -51,6 +52,10 @@ end
 local function getPlayerDataPath()
     local playerName = player.Name
     return "Umbrella/User_" .. playerName .. ".json"
+end
+
+function API:setCategories(customCategories)
+    self.categories = customCategories
 end
 
 local function saveSettings()
@@ -1579,11 +1584,9 @@ function createMainUI()
         end)
     end
 
-    addCategory("http://www.roblox.com/asset/?id=103577523623326", "Server")
-    addCategory("http://www.roblox.com/asset/?id=136613041915472", "World")
-    addCategory("http://www.roblox.com/asset/?id=85568792810849", "Player")
-    addCategory("http://www.roblox.com/asset/?id=124280107087786", "Utility")
-    addCategory("http://www.roblox.com/asset/?id=109730932565942", "Combat")
+    for _, category in ipairs(API.categories) do
+        addCategory(category.icon, category.name)
+    end
     
     local settingsContainer = Instance.new("Frame")
     settingsContainer.Name = "SettingsContainer"
