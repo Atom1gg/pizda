@@ -272,15 +272,47 @@ end
 -- ================================
 -- ESP MODULE
 -- ================================
+-- ================================
+-- ENHANCED ESP MODULE FOR R15/R6
+-- ================================
 local SkeletonESP = {
     Enabled = false,
     TeamColor = true,
     EnemyColor = Color3.fromRGB(255, 50, 50),
     AllyColor = Color3.fromRGB(50, 50, 255),
     Thickness = 1,
-    ShowWeapon = true
+    ShowWeapon = true,
+    ShowHealthBar = true,
+    ShowName = true,
+    ShowHead = true
 }
 
+-- Team colors
+local TeamColors = {
+    ["Counter-Terrorists"] = Color3.fromRGB(0, 150, 255), -- Синий для КТ
+    ["Terrorists"] = Color3.fromRGB(255, 200, 0), -- Желтый для Т
+    defaultEnemy = Color3.fromRGB(255, 0, 0) -- Красный для остальных
+}
+
+-- R15 bone structure
+local R15_BONES = {
+    {"Head", "UpperTorso"},
+    {"UpperTorso", "LowerTorso"},
+    {"UpperTorso", "LeftUpperArm"},
+    {"UpperTorso", "RightUpperArm"},
+    {"LeftUpperArm", "LeftLowerArm"},
+    {"LeftLowerArm", "LeftHand"},
+    {"RightUpperArm", "RightLowerArm"},
+    {"RightLowerArm", "RightHand"},
+    {"LowerTorso", "LeftUpperLeg"},
+    {"LowerTorso", "RightUpperLeg"},
+    {"LeftUpperLeg", "LeftLowerLeg"},
+    {"LeftLowerLeg", "LeftFoot"},
+    {"RightUpperLeg", "RightLowerLeg"},
+    {"RightLowerLeg", "RightFoot"}
+}
+
+-- R6 fallback bones
 local R6_BONES = {
     {"Head", "Torso"},
     {"Torso", "Left Arm"},
@@ -289,10 +321,7 @@ local R6_BONES = {
     {"Torso", "Right Leg"}
 }
 
-local WEAPON_ATTACHMENTS = {
-    "RightHand",
-    "LeftHand"
-}
+local WEAPON_ATTACHMENTS = {"RightHand", "LeftHand"}
 
 local drawings = {}
 
@@ -304,7 +333,58 @@ local function CreateDrawing(type, props)
     return drawing
 end
 
+local function GetRigType(character)
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        return humanoid.RigType
+    end
+    
+    if character:FindFirstChild("UpperTorso") then
+        return Enum.HumanoidRigType.R15
+    elseif character:FindFirstChild("Torso") then
+        return Enum.HumanoidRigType.R6
+    end
+    
+    return Enum.HumanoidRigType.R6
+end
+
+local function GetPlayerColor(player)
+    if SkeletonESP.TeamColor then
+        if player.Team and TeamColors[player.Team.Name] then
+            return TeamColors[player.Team.Name]
+        else
+            return TeamColors.defaultEnemy
+        end
+    else
+        return SkeletonESP.EnemyColor
+    end
+end
+
+local function GetEquippedWeapon(character)
+    local equippedTool = character:FindFirstChild("EquippedTool")
+    if equippedTool and equippedTool.Value then
+        return equippedTool.Value
+    end
+    
+    -- Fallback - check for tools
+    local tool = character:FindFirstChildOfClass("Tool")
+    if tool then
+        return tool.Name
+    end
+    
+    return "None"
+end
+
+local function GetPlayerHealth(character)
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        return math.floor(humanoid.Health), math.floor(humanoid.MaxHealth)
+    end
+    return 0, 100
+end
+
 local function UpdateESP()
+    -- Hide all drawings first
     for _, drawing in pairs(drawings) do
         drawing.Visible = false
     end
@@ -312,66 +392,190 @@ local function UpdateESP()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             local character = player.Character
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            local rigType = GetRigType(character)
+            local color = GetPlayerColor(player)
+            local head = character:FindFirstChild("Head")
             
-            if humanoid and humanoid.RigType == Enum.HumanoidRigType.R6 then
-                local color = SkeletonESP.TeamColor and 
-                             (player.Team == LocalPlayer.Team and SkeletonESP.AllyColor or SkeletonESP.EnemyColor) or
-                             SkeletonESP.EnemyColor
-                
-                for _, bonePair in ipairs(R6_BONES) do
-                    local part1 = character:FindFirstChild(bonePair[1])
-                    local part2 = character:FindFirstChild(bonePair[2])
-                    
-                    if part1 and part2 then
-                        local key = player.Name..bonePair[1]..bonePair[2]
-                        if not drawings[key] then
-                            drawings[key] = CreateDrawing("Line", {
-                                Thickness = SkeletonESP.Thickness,
-                                Color = color,
-                                Visible = false
-                            })
-                        end
-                        
-                        local pos1 = Camera:WorldToViewportPoint(part1.Position)
-                        local pos2 = Camera:WorldToViewportPoint(part2.Position)
-                        
-                        if pos1.Z > 0 and pos2.Z > 0 then
-                            drawings[key].From = Vector2.new(pos1.X, pos1.Y)
-                            drawings[key].To = Vector2.new(pos2.X, pos2.Y)
-                            drawings[key].Visible = SkeletonESP.Enabled
-                            drawings[key].Color = color
-                            drawings[key].Thickness = SkeletonESP.Thickness
-                        end
-                    end
+            if not head then continue end
+            
+            local headPos, headOnScreen = Camera:WorldToViewportPoint(head.Position)
+            if not headOnScreen or headPos.Z <= 0 then continue end
+            
+            -- Draw head circle
+            if SkeletonESP.ShowHead then
+                local headKey = player.Name.."Head"
+                if not drawings[headKey] then
+                    drawings[headKey] = CreateDrawing("Circle", {
+                        Color = color,
+                        Thickness = SkeletonESP.Thickness,
+                        Radius = 8,
+                        Filled = false,
+                        Visible = false
+                    })
                 end
                 
-                if SkeletonESP.ShowWeapon then
-                    for _, attachName in ipairs(WEAPON_ATTACHMENTS) do
-                        local attach = character:FindFirstChild(attachName)
-                        if attach then
-                            for _, child in ipairs(attach:GetChildren()) do
-                                if child:IsA("BasePart") and child.Name ~= "Handle" then
-                                    local key = player.Name.."Weapon"..child.Name
-                                    if not drawings[key] then
-                                        drawings[key] = CreateDrawing("Line", {
-                                            Thickness = SkeletonESP.Thickness,
-                                            Color = color,
-                                            Visible = false
-                                        })
-                                    end
-                                    
-                                    local handPos = Camera:WorldToViewportPoint(attach.Position)
-                                    local weaponPos = Camera:WorldToViewportPoint(child.Position)
-                                    
-                                    if handPos.Z > 0 and weaponPos.Z > 0 then
-                                        drawings[key].From = Vector2.new(handPos.X, handPos.Y)
-                                        drawings[key].To = Vector2.new(weaponPos.X, weaponPos.Y)
-                                        drawings[key].Visible = SkeletonESP.Enabled
-                                        drawings[key].Color = color
-                                        drawings[key].Thickness = SkeletonESP.Thickness
-                                    end
-                                end
+                drawings[headKey].Position = Vector2.new(headPos.X, headPos.Y)
+                drawings[headKey].Color = color
+                drawings[headKey].Radius = 8
+                drawings[headKey].Thickness = SkeletonESP.Thickness
+                drawings[headKey].Visible = SkeletonESP.Enabled
+            end
+            
+            -- Draw skeleton
+            local bones = (rigType == Enum.HumanoidRigType.R15) and R15_BONES or R6_BONES
+            
+            for _, bonePair in ipairs(bones) do
+                local part1 = character:FindFirstChild(bonePair[1])
+                local part2 = character:FindFirstChild(bonePair[2])
+                
+                if part1 and part2 then
+                    local key = player.Name..bonePair[1]..bonePair[2]
+                    if not drawings[key] then
+                        drawings[key] = CreateDrawing("Line", {
+                            Thickness = SkeletonESP.Thickness,
+                            Color = color,
+                            Visible = false
+                        })
+                    end
+                    
+                    local pos1, onScreen1 = Camera:WorldToViewportPoint(part1.Position)
+                    local pos2, onScreen2 = Camera:WorldToViewportPoint(part2.Position)
+                    
+                    if onScreen1 and onScreen2 and pos1.Z > 0 and pos2.Z > 0 then
+                        drawings[key].From = Vector2.new(pos1.X, pos1.Y)
+                        drawings[key].To = Vector2.new(pos2.X, pos2.Y)
+                        drawings[key].Visible = SkeletonESP.Enabled
+                        drawings[key].Color = color
+                        drawings[key].Thickness = SkeletonESP.Thickness
+                    end
+                end
+            end
+            
+            -- Show name
+            if SkeletonESP.ShowName then
+                local nameKey = player.Name.."Name"
+                if not drawings[nameKey] then
+                    drawings[nameKey] = CreateDrawing("Text", {
+                        Text = player.Name,
+                        Size = 16,
+                        Color = color,
+                        Center = true,
+                        Outline = true,
+                        OutlineColor = Color3.fromRGB(0, 0, 0),
+                        Visible = false
+                    })
+                end
+                
+                drawings[nameKey].Text = player.Name
+                drawings[nameKey].Position = Vector2.new(headPos.X, headPos.Y - 35)
+                drawings[nameKey].Color = color
+                drawings[nameKey].Visible = SkeletonESP.Enabled
+            end
+            
+            -- Show health bar (vertical, to the side)
+            if SkeletonESP.ShowHealthBar then
+                local currentHealth, maxHealth = GetPlayerHealth(character)
+                local healthPercentage = currentHealth / maxHealth
+                
+                -- Health bar background (vertical)
+                local healthBgKey = player.Name.."HealthBg"
+                if not drawings[healthBgKey] then
+                    drawings[healthBgKey] = CreateDrawing("Line", {
+                        Thickness = 4,
+                        Color = Color3.fromRGB(50, 50, 50),
+                        Visible = false
+                    })
+                end
+                
+                drawings[healthBgKey].From = Vector2.new(headPos.X - 35, headPos.Y - 20)
+                drawings[healthBgKey].To = Vector2.new(headPos.X - 35, headPos.Y + 30)
+                drawings[healthBgKey].Visible = SkeletonESP.Enabled
+                
+                -- Health bar fill (vertical)
+                local healthKey = player.Name.."Health"
+                if not drawings[healthKey] then
+                    drawings[healthKey] = CreateDrawing("Line", {
+                        Thickness = 2,
+                        Color = Color3.fromRGB(0, 255, 0),
+                        Visible = false
+                    })
+                end
+                
+                local healthColor = Color3.fromRGB(
+                    255 * (1 - healthPercentage),
+                    255 * healthPercentage,
+                    0
+                )
+                
+                local healthHeight = 50 * healthPercentage
+                drawings[healthKey].From = Vector2.new(headPos.X - 35, headPos.Y + 30)
+                drawings[healthKey].To = Vector2.new(headPos.X - 35, headPos.Y + 30 - healthHeight)
+                drawings[healthKey].Color = healthColor
+                drawings[healthKey].Visible = SkeletonESP.Enabled
+                
+                -- Health text
+                local healthTextKey = player.Name.."HealthText"
+                if not drawings[healthTextKey] then
+                    drawings[healthTextKey] = CreateDrawing("Text", {
+                        Size = 12,
+                        Color = Color3.fromRGB(255, 255, 255),
+                        Center = true,
+                        Outline = true,
+                        OutlineColor = Color3.fromRGB(0, 0, 0),
+                        Visible = false
+                    })
+                end
+                
+                drawings[healthTextKey].Text = tostring(currentHealth)
+                drawings[healthTextKey].Position = Vector2.new(headPos.X - 50, headPos.Y + 5)
+                drawings[healthTextKey].Visible = SkeletonESP.Enabled
+            end
+            
+            -- Show weapon
+            if SkeletonESP.ShowWeapon then
+                local weapon = GetEquippedWeapon(character)
+                local weaponKey = player.Name.."Weapon"
+                if not drawings[weaponKey] then
+                    drawings[weaponKey] = CreateDrawing("Text", {
+                        Size = 14,
+                        Color = color,
+                        Center = true,
+                        Outline = true,
+                        OutlineColor = Color3.fromRGB(0, 0, 0),
+                        Visible = false
+                    })
+                end
+                
+                drawings[weaponKey].Text = weapon
+                drawings[weaponKey].Position = Vector2.new(headPos.X, headPos.Y - 50)
+                drawings[weaponKey].Color = color
+                drawings[weaponKey].Visible = SkeletonESP.Enabled
+            end
+            
+            -- Show weapon lines (original weapon attachment lines)
+            for _, attachName in ipairs(WEAPON_ATTACHMENTS) do
+                local attach = character:FindFirstChild(attachName)
+                if attach then
+                    for _, child in ipairs(attach:GetChildren()) do
+                        if child:IsA("BasePart") and child.Name ~= "Handle" then
+                            local key = player.Name.."WeaponLine"..child.Name
+                            if not drawings[key] then
+                                drawings[key] = CreateDrawing("Line", {
+                                    Thickness = SkeletonESP.Thickness,
+                                    Color = color,
+                                    Visible = false
+                                })
+                            end
+                            
+                            local handPos, handOnScreen = Camera:WorldToViewportPoint(attach.Position)
+                            local weaponPos, weaponOnScreen = Camera:WorldToViewportPoint(child.Position)
+                            
+                            if handOnScreen and weaponOnScreen and handPos.Z > 0 and weaponPos.Z > 0 then
+                                drawings[key].From = Vector2.new(handPos.X, handPos.Y)
+                                drawings[key].To = Vector2.new(weaponPos.X, weaponPos.Y)
+                                drawings[key].Visible = SkeletonESP.Enabled
+                                drawings[key].Color = color
+                                drawings[key].Thickness = SkeletonESP.Thickness
                             end
                         end
                     end
@@ -977,6 +1181,7 @@ end
 -- ================================
 
 -- PLAYER MODULES
+
 UmbrellaHub.api:registerModule("Player", {
     name = "Auto Bhop",
     enabled = false,
@@ -1079,6 +1284,7 @@ UmbrellaHub.api:registerModule("Utility", {
 -- ================================
 -- SETTINGS REGISTRATION
 -- ================================
+
 -- Auto Bhop Settings
 UmbrellaHub.api:registerSettings("Auto Bhop", {
     {
@@ -1301,6 +1507,30 @@ UmbrellaHub.api:registerSettings("ESP", {
         default = true,
         callback = function(value)
             SkeletonESP.TeamColor = value
+        end
+    },
+    {
+        name = "Show Health Bar",
+        type = "toggle", 
+        default = true,
+        callback = function(value)
+            SkeletonESP.ShowHealthBar = value
+        end
+    },
+    {
+        name = "Show Name",
+        type = "toggle",
+        default = true,
+        callback = function(value)
+            SkeletonESP.ShowName = value
+        end
+    },
+    {
+        name = "Show Head",
+        type = "toggle",
+        default = true,
+        callback = function(value)
+            SkeletonESP.ShowHead = value
         end
     },
     {
