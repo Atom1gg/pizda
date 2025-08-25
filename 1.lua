@@ -1584,9 +1584,18 @@ function createMainUI()
         end)
     end
 
+if #API.categories > 0 then
     for _, category in ipairs(API.categories) do
         addCategory(category.icon, category.name)
     end
+else
+    -- Категории по умолчанию (на случай если не настроены)
+    addCategory("http://www.roblox.com/asset/?id=103577523623326", "Server")
+    addCategory("http://www.roblox.com/asset/?id=136613041915472", "World")
+    addCategory("http://www.roblox.com/asset/?id=85568792810849", "Player")
+    addCategory("http://www.roblox.com/asset/?id=124280107087786", "Utility")
+    addCategory("http://www.roblox.com/asset/?id=109730932565942", "Combat")
+end
     
     local settingsContainer = Instance.new("Frame")
     settingsContainer.Name = "SettingsContainer"
