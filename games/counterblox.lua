@@ -740,16 +740,12 @@ local function toggleQuickDefuse(state)
     end
 end
 
--- ================================
 -- SILENT AIM MODULE
--- ================================
--- ================================
--- SILENT AIM MODULE (УЛУЧШЕННЫЙ)
 -- ================================
 local SilentAimModule = {}
 local silentAimSettings = {
     CheckTeam = true,
-    HeadChance = 80, -- Процент шанса попадания в голову
+    HeadChance = 50, -- Процент шанса попадания в голову
     FOVEnabled = true,
     FOV = 60,
     Enabled = false
@@ -758,7 +754,7 @@ local silentAimSettings = {
 local CurrentCamera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
--- Фейковый FOV круг (не влияет на аим)
+-- Фейковый FOV круг
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Color = Color3.fromRGB(255, 255, 255)
 FOVCircle.Transparency = 0.5
@@ -770,7 +766,9 @@ local fovUpdateConnection
 
 local function UpdateFOVCircle()
     if silentAimSettings.FOVEnabled and silentAimSettings.Enabled then
-        FOVCircle.Position = Vector2.new(Mouse.X, Mouse.Y)
+        -- Привязываем к центру экрана, а не к курсору
+        local screenSize = CurrentCamera.ViewportSize
+        FOVCircle.Position = Vector2.new(screenSize.X / 2, screenSize.Y / 2)
         FOVCircle.Radius = silentAimSettings.FOV
         FOVCircle.Visible = true
     else
@@ -789,6 +787,7 @@ local function FindTarget()
     
     local MaxDist = math.huge
     local Closest = nil
+    local screenCenter = CurrentCamera.ViewportSize / 2
     
     for _, Player in ipairs(GetPlayers(Players)) do
         if Player == LocalPlayer then continue end
@@ -812,9 +811,14 @@ local function FindTarget()
         local Pos, Vis = WorldToScreenPoint(CurrentCamera, TargetPart.Position)
         if not Vis then continue end
         
-        local MousePos = Vector2_new(Mouse.X, Mouse.Y)
+        -- Проверяем расстояние от центра экрана, а не от курсора
         local TheirPos = Vector2_new(Pos.X, Pos.Y)
-        local Dist = (TheirPos - MousePos).Magnitude
+        local Dist = (TheirPos - screenCenter).Magnitude
+        
+        -- Проверяем FOV только если включен
+        if silentAimSettings.FOVEnabled and Dist > silentAimSettings.FOV then
+            continue
+        end
         
         if Dist < MaxDist then
             MaxDist = Dist
@@ -834,12 +838,22 @@ MT.__namecall = newcclosure(function(self, ...)
     local Method = getnamecallmethod()
     
     if Method == "FindPartOnRayWithIgnoreList" and not checkcaller() and silentAimSettings.Enabled then
-        local Target = FindTarget()
-        if Target and Target.Part then
-            local RayOrigin = CurrentCamera.CFrame.Position
-            local RayDirection = (Target.Part.Position - RayOrigin).Unit * 1000
-            Args[1] = Ray_new(RayOrigin, RayDirection)
-            return OldNC(self, unpack(Args))
+        local rayArg = Args[1]
+        
+        -- Фильтруем только боевые рейкасты (длинные лучи от камеры)
+        if rayArg and rayArg.Direction.Magnitude > 100 then
+            local rayOrigin = rayArg.Origin
+            local cameraPos = CurrentCamera.CFrame.Position
+            
+            -- Проверяем что рейкаст идет от камеры (боевой рейкаст)
+            if (rayOrigin - cameraPos).Magnitude < 5 then
+                local Target = FindTarget()
+                if Target and Target.Part then
+                    local RayDirection = (Target.Part.Position - cameraPos).Unit * rayArg.Direction.Magnitude
+                    Args[1] = Ray_new(cameraPos, RayDirection)
+                    return OldNC(self, unpack(Args))
+                end
+            end
         end
     end
     
@@ -1900,7 +1914,7 @@ UmbrellaHub.api:registerSettings("Silent Aim", {
         name = "FOV",
         type = "slider",
         min = 10,
-        max = 200,
+        max = 500,
         default = 60,
         callback = function(value)
             silentAimSettings.FOV = value
