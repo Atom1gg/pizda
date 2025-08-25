@@ -272,9 +272,6 @@ end
 -- ================================
 -- ESP MODULE
 -- ================================
--- ================================
--- ENHANCED ESP MODULE FOR R15/R6
--- ================================
 local SkeletonESP = {
     Enabled = false,
     TeamColor = true,
@@ -998,6 +995,277 @@ local function toggleThirdPerson(state)
 end
 
 -- ================================
+-- INFINITE AMMO MODULE
+-- ================================
+local InfiniteAmmoModule = {
+    enabled = false,
+    connection = nil
+}
+
+local function setupInfiniteAmmo()
+    if InfiniteAmmoModule.connection then
+        InfiniteAmmoModule.connection:Disconnect()
+    end
+    
+    InfiniteAmmoModule.connection = RunService.Heartbeat:Connect(function()
+        if not InfiniteAmmoModule.enabled or not LocalPlayer.Character then return end
+        
+        -- Поиск клиентских переменных боеприпасов
+        for _, v in pairs(getgc(true)) do
+            if type(v) == "table" then
+                -- Основные патроны
+                if rawget(v, "ammocount") and type(v.ammocount) == "number" and v.ammocount < 999999 then
+                    v.ammocount = 999999
+                end
+                
+                if rawget(v, "primarystored") and type(v.primarystored) == "number" and v.primarystored < 999999 then
+                    v.primarystored = 999999
+                end
+                
+                -- Вторичные патроны
+                if rawget(v, "ammocount2") and type(v.ammocount2) == "number" and v.ammocount2 < 999999 then
+                    v.ammocount2 = 999999
+                end
+                
+                if rawget(v, "secondarystored") and type(v.secondarystored) == "number" and v.secondarystored < 999999 then
+                    v.secondarystored = 999999
+                end
+            end
+        end
+        
+        -- Модификация оружия в инвентаре и руках
+        if LocalPlayer.Character:FindFirstChild("Gun") then
+            local gun = LocalPlayer.Character.Gun
+            if gun:FindFirstChild("Ammo") and gun.Ammo.Value < 999 then
+                gun.Ammo.Value = 999
+            end
+            if gun:FindFirstChild("StoredAmmo") and gun.StoredAmmo.Value < 999 then
+                gun.StoredAmmo.Value = 999
+            end
+        end
+        
+        for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+            if tool:IsA("Tool") and tool:FindFirstChild("StoredAmmo") then
+                tool.StoredAmmo.Value = 999
+            end
+        end
+    end)
+end
+
+local function toggleInfiniteAmmo(state)
+    if state == InfiniteAmmoModule.enabled then return end
+    
+    InfiniteAmmoModule.enabled = state
+    if state then
+        setupInfiniteAmmo()
+    else
+        if InfiniteAmmoModule.connection then
+            InfiniteAmmoModule.connection:Disconnect()
+            InfiniteAmmoModule.connection = nil
+        end
+    end
+end
+
+-- ================================
+-- RAPID FIRE MODULE
+-- ================================
+local RapidFireModule = {
+    enabled = false,
+    fireRateMultiplier = 5.0,
+    originalFireRates = {},
+    connection = nil
+}
+
+local function modifyWeaponFireRate(gun)
+    if not gun or not RapidFireModule.enabled then return end
+    
+    local gunName = gun.Name
+    if not RapidFireModule.originalFireRates[gunName] then
+        -- Сохраняем оригинальную скорострельность
+        if gun:FindFirstChild("FireRate") then
+            RapidFireModule.originalFireRates[gunName] = gun.FireRate.Value
+        elseif gun:FindFirstChild("Firerate") then
+            RapidFireModule.originalFireRates[gunName] = gun.Firerate.Value
+        end
+    end
+    
+    -- Устанавливаем повышенную скорострельность
+    if gun:FindFirstChild("FireRate") then
+        gun.FireRate.Value = (RapidFireModule.originalFireRates[gunName] or 0.1) * RapidFireModule.fireRateMultiplier
+    elseif gun:FindFirstChild("Firerate") then
+        gun.Firerate.Value = (RapidFireModule.originalFireRates[gunName] or 0.1) * RapidFireModule.fireRateMultiplier
+    end
+    
+    -- Отключаем задержки между выстрелами
+    if gun:FindFirstChild("Auto") then
+        gun.Auto.Value = true
+    end
+end
+
+local function setupRapidFire()
+    if RapidFireModule.connection then
+        RapidFireModule.connection:Disconnect()
+    end
+    
+    RapidFireModule.connection = RunService.Heartbeat:Connect(function()
+        if not RapidFireModule.enabled or not LocalPlayer.Character then return end
+        
+        -- Модифицируем текущее оружие
+        if LocalPlayer.Character:FindFirstChild("Gun") then
+            modifyWeaponFireRate(LocalPlayer.Character.Gun)
+        end
+        
+        -- Модифицируем оружие в инвентаре
+        for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+            if tool:IsA("Tool") then
+                modifyWeaponFireRate(tool)
+            end
+        end
+    end)
+end
+
+local function toggleRapidFire(state)
+    if state == RapidFireModule.enabled then return end
+    
+    RapidFireModule.enabled = state
+    if state then
+        setupRapidFire()
+    else
+        if RapidFireModule.connection then
+            RapidFireModule.connection:Disconnect()
+            RapidFireModule.connection = nil
+        end
+        
+        -- Восстановление оригинальных значений
+        for gunName, originalRate in pairs(RapidFireModule.originalFireRates) do
+            local gun = workspace:FindFirstChild(gunName) or LocalPlayer.Backpack:FindFirstChild(gunName) or LocalPlayer.Character:FindFirstChild(gunName)
+            if gun then
+                if gun:FindFirstChild("FireRate") then
+                    gun.FireRate.Value = originalRate
+                elseif gun:FindFirstChild("Firerate") then
+                    gun.Firerate.Value = originalRate
+                end
+            end
+        end
+    end
+end
+
+
+-- ================================
+-- PENETRATION MODULE (ИСПРАВЛЕННЫЙ)
+-- ================================
+local PenetrationModule = {
+    enabled = false,
+    maxPenetration = 100,
+    maxObstacles = 4
+}
+
+-- Глобальные переменные
+local Ignore2 = {workspace.Debris, workspace.Ray_Ignore}
+local Multipliers = {
+    Head = 4.0,
+    UpperTorso = 1.0,
+    LowerTorso = 1.0,
+    LeftUpperArm = 0.5,
+    RightUpperArm = 0.5,
+    LeftLowerArm = 0.5,
+    RightLowerArm = 0.5,
+    LeftHand = 0.5,
+    RightHand = 0.5,
+    LeftUpperLeg = 0.5,
+    RightUpperLeg = 0.5,
+    LeftLowerLeg = 0.5,
+    RightLowerLeg = 0.5,
+    LeftFoot = 0.5,
+    RightFoot = 0.5
+}
+
+-- Проверяем, не инициализировали ли мы уже метатаблицу
+if not _G.PenetrationMetaTableInitialized then
+    _G.PenetrationMetaTableInitialized = true
+    
+    local mt = getrawmetatable(game)
+    local oldNC = mt.__namecall
+    local oldIndex = mt.__index
+    
+    setreadonly(mt, false)
+
+    mt.__namecall = newcclosure(function(self, ...)
+        local args = {...}
+        local method = getnamecallmethod()
+        
+        if method == "FindPartOnRayWithIgnoreList" and args[2] and type(args[2]) == "table" and args[2][1] == workspace.Debris then
+            if PenetrationModule.enabled then
+                -- Создаем копию таблицы, а не изменяем оригинальную
+                local newIgnoreList = {unpack(args[2])}
+                table.insert(newIgnoreList, workspace.Map)
+                args[2] = newIgnoreList
+            end
+            return oldNC(self, unpack(args))
+        end
+        
+        return oldNC(self, ...)
+    end)
+
+    mt.__index = newcclosure(function(self, key)
+        if key == "Value" then
+            if self.Name == "Penetration" and PenetrationModule.enabled then
+                return PenetrationModule.maxPenetration
+            end
+        end
+        return oldIndex(self, key)
+    end)
+
+    setreadonly(mt, true)
+end
+
+-- Функция для расчета проникающей способности
+local function CalculatePenetration(origin, targetPart, gunPenetration)
+    if not PenetrationModule.enabled then return false, 1.0 end
+    
+    local hits = {}
+    local ignoreList = {unpack(Ignore2)}
+    local endHit, hit, pos
+    local penetrationValue = gunPenetration * 0.01
+    
+    local direction = (targetPart.Position - origin).unit
+    local distance = (targetPart.Position - origin).magnitude
+    local ray = Ray.new(origin, direction * distance)
+    
+    repeat
+        hit, pos = workspace:FindPartOnRayWithIgnoreList(ray, ignoreList, false, true)
+        if hit and hit.Parent then
+            if Multipliers[hit.Name] then
+                endHit = hit
+            else
+                table.insert(ignoreList, hit)
+                table.insert(hits, {
+                    Position = pos,
+                    Hit = hit,
+                    Thickness = (hit.Size.X + hit.Size.Y + hit.Size.Z) / 3
+                })
+            end
+        end
+    until endHit or #hits >= PenetrationModule.maxObstacles or not hit
+    
+    -- Расчет уменьшения урона на основе толщины препятствий
+    local damageMultiplier = 1.0
+    if #hits > 0 then
+        for _, obstacle in ipairs(hits) do
+            local thicknessFactor = math.clamp(obstacle.Thickness / 5, 0.1, 0.8)
+            damageMultiplier = damageMultiplier * (1 - thicknessFactor * (1 - penetrationValue))
+        end
+    end
+    
+    return endHit and #hits > 0, math.clamp(damageMultiplier, 0.1, 1.0)
+end
+
+-- Функция для использования в других модулях
+local function togglePenetration(state)
+    PenetrationModule.enabled = state
+end
+
+-- ================================
 -- BOMB ESP MODULE
 -- ================================
 local BombESPModule = {
@@ -1005,71 +1273,203 @@ local BombESPModule = {
     color = Color3.fromRGB(255, 0, 0),
     transparency = 0.5,
     showText = true,
-    highlight = nil,
-    textLabel = nil,
-    connection = nil
+    highlights = {},
+    textLabels = {},
+    connections = {},
+    bombTimer = 40,
+    bombPlanted = false
 }
 
 local function CreateBombESP(bomb)
+    -- Проверяем, поставлена ли бомба
+    local isPlanted = bomb:FindFirstChild("Planted") and bomb.Planted.Value
+    
+    -- Создаем highlight
     local highlight = Instance.new("Highlight")
     highlight.FillColor = BombESPModule.color
     highlight.FillTransparency = BombESPModule.transparency
-    highlight.OutlineColor = BombESPModule.color
-    highlight.OutlineTransparency = 0
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineTransparency = 0.2
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     highlight.Parent = bomb
     
-    local billboard = Instance.new("BillboardGui")
-    billboard.Size = UDim2.new(0, 200, 0, 50)
-    billboard.StudsOffset = Vector3.new(0, 2, 0)
-    billboard.Adornee = bomb
-    billboard.Parent = bomb
+    -- Создаем BillboardGui для текста только если включено отображение текста
+    local billboard
+    if BombESPModule.showText then
+        billboard = Instance.new("BillboardGui")
+        billboard.Name = "BombESPGui"
+        billboard.Size = UDim2.new(0, 200, 0, 60)
+        billboard.StudsOffset = Vector3.new(0, 2, 0)
+        billboard.Adornee = bomb
+        billboard.Parent = bomb
+        
+        -- Фон для текста
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1, 0, 1, 0)
+        frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        frame.BackgroundTransparency = 0.3
+        frame.BorderSizePixel = 0
+        frame.Parent = billboard
+        
+        -- Скругляем углы
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = frame
+        
+        -- Обводка
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = BombESPModule.color
+        stroke.Thickness = 2
+        stroke.Parent = frame
+        
+        -- Основной текст
+        local titleText = Instance.new("TextLabel")
+        titleText.Size = UDim2.new(1, 0, 0.5, 0)
+        titleText.Position = UDim2.new(0, 0, 0, 0)
+        titleText.Text = isPlanted and "BOMB PLANTED" or "C4 DROPPED"
+        titleText.TextColor3 = BombESPModule.color
+        titleText.TextScaled = true
+        titleText.TextStrokeTransparency = 0
+        titleText.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        titleText.BackgroundTransparency = 1
+        titleText.Font = Enum.Font.GothamBold
+        titleText.Parent = frame
+        
+        -- Таймер (только если бомба поставлена)
+        local timerText = Instance.new("TextLabel")
+        timerText.Size = UDim2.new(1, 0, 0.5, 0)
+        timerText.Position = UDim2.new(0, 0, 0.5, 0)
+        timerText.Text = isPlanted and "40.0s" or ""
+        timerText.TextColor3 = Color3.fromRGB(255, 255, 0)
+        timerText.TextScaled = true
+        timerText.TextStrokeTransparency = 0
+        timerText.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        timerText.BackgroundTransparency = 1
+        timerText.Font = Enum.Font.GothamBold
+        timerText.Parent = frame
+        
+        -- Сохраняем ссылки
+        BombESPModule.textLabels[bomb] = {titleText, timerText, frame, billboard}
+        
+        -- Запускаем таймер если бомба поставлена
+        if isPlanted then
+            local startTime = tick()
+            
+            local function updateTimer()
+                while bomb.Parent and BombESPModule.enabled do
+                    local elapsed = tick() - startTime
+                    local remaining = math.max(0, 40 - elapsed)
+                    
+                    -- Обновляем текст таймера
+                    timerText.Text = string.format("%.1fs", remaining)
+                    
+                    -- Меняем цвета в зависимости от времени
+                    if remaining <= 10 then
+                        timerText.TextColor3 = Color3.fromRGB(255, 0, 0)
+                        titleText.TextColor3 = Color3.fromRGB(255, 0, 0)
+                        stroke.Color = Color3.fromRGB(255, 0, 0)
+                    elseif remaining <= 20 then
+                        timerText.TextColor3 = Color3.fromRGB(255, 165, 0)
+                        titleText.TextColor3 = Color3.fromRGB(255, 100, 0)
+                        stroke.Color = Color3.fromRGB(255, 165, 0)
+                    else
+                        timerText.TextColor3 = Color3.fromRGB(255, 255, 0)
+                        titleText.TextColor3 = BombESPModule.color
+                        stroke.Color = BombESPModule.color
+                    end
+                    
+                    if remaining <= 0 then
+                        timerText.Text = "BOOM!"
+                        break
+                    end
+                    
+                    wait(0.1)
+                end
+            end
+            
+            coroutine.wrap(updateTimer)()
+        end
+    end
     
-    local text = Instance.new("TextLabel")
-    text.Size = UDim2.new(1, 0, 1, 0)
-    text.Text = "BOMB"
-    text.TextColor3 = Color3.new(1, 1, 1)
-    text.TextScaled = true
-    text.BackgroundTransparency = 1
-    text.Visible = BombESPModule.showText
-    text.Parent = billboard
+    -- Сохраняем ссылки
+    BombESPModule.highlights[bomb] = highlight
+end
+
+local function RemoveBombESP(bomb)
+    if BombESPModule.highlights[bomb] then
+        BombESPModule.highlights[bomb]:Destroy()
+        BombESPModule.highlights[bomb] = nil
+    end
     
-    BombESPModule.highlight = highlight
-    BombESPModule.textLabel = text
+    if BombESPModule.textLabels[bomb] then
+        for _, label in pairs(BombESPModule.textLabels[bomb]) do
+            if label and label.Parent then
+                label:Destroy()
+            end
+        end
+        BombESPModule.textLabels[bomb] = nil
+    end
+end
+
+local function CheckForBombs()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if (obj.Name == "C4" or obj.Name == "Bomb") and not BombESPModule.highlights[obj] then
+            CreateBombESP(obj)
+        end
+    end
+end
+
+local function OnBombStateChanged(bomb)
+    if BombESPModule.highlights[bomb] then
+        RemoveBombESP(bomb)
+        CreateBombESP(bomb)
+    end
 end
 
 local function toggleBombESP(state)
+    BombESPModule.enabled = state
+    
     if state then
-        if BombESPModule.enabled then return end
+        -- Ищем существующие бомбы
+        CheckForBombs()
         
-        local bomb = workspace:FindFirstChild("C4") or workspace:FindFirstChild("Bomb")
-        if bomb then
-            CreateBombESP(bomb)
-        end
-        
-        BombESPModule.connection = workspace.ChildAdded:Connect(function(child)
-            if child.Name == "C4" or child.Name == "Bomb" then
+        -- Следим за новыми бомбами
+        BombESPModule.connections.childAdded = workspace.DescendantAdded:Connect(function(child)
+            if (child.Name == "C4" or child.Name == "Bomb") and BombESPModule.enabled then
+                wait(0.1)
                 CreateBombESP(child)
             end
         end)
         
-        BombESPModule.enabled = true
+        -- Следим за удалением бомб
+        BombESPModule.connections.childRemoved = workspace.DescendantRemoving:Connect(function(child)
+            if (child.Name == "C4" or child.Name == "Bomb") and BombESPModule.highlights[child] then
+                RemoveBombESP(child)
+            end
+        end)
+        
+        -- Следим за изменением состояния бомбы
+        BombESPModule.connections.bombState = workspace.ChildChanged:Connect(function(child)
+            if (child.Name == "C4" or child.Name == "Bomb") and child:FindFirstChild("Planted") then
+                OnBombStateChanged(child)
+            end
+        end)
+        
     else
-        if not BombESPModule.enabled then return end
+        -- Отключаем все соединения
+        for name, connection in pairs(BombESPModule.connections) do
+            if connection then
+                connection:Disconnect()
+            end
+        end
+        BombESPModule.connections = {}
         
-        if BombESPModule.connection then
-            BombESPModule.connection:Disconnect()
+        -- Удаляем все ESP элементы
+        for bomb, _ in pairs(BombESPModule.highlights) do
+            RemoveBombESP(bomb)
         end
-        if BombESPModule.highlight then
-            BombESPModule.highlight:Destroy()
-        end
-        if BombESPModule.textLabel then
-            BombESPModule.textLabel:Destroy()
-        end
-        
-        BombESPModule.enabled = false
     end
 end
-
 -- ================================
 -- GRENADE TRAJECTORY MODULE
 -- ================================
@@ -1082,7 +1482,7 @@ local GrenadeTrajectory = {
     Connection = nil
 }
 
-local function CreatePart()
+local function CreateTrajectoryPart()
     local part = Instance.new("Part")
     part.Anchored = true
     part.CanCollide = false
@@ -1099,36 +1499,46 @@ end
 
 local function ClearTrajectory()
     for _, part in ipairs(GrenadeTrajectory.Parts) do
-        part:Destroy()
+        if part then
+            part:Destroy()
+        end
     end
     GrenadeTrajectory.Parts = {}
 end
 
-local function CalculateTrajectory(startPos, velocity, gravity, steps)
+local function CalculateTrajectory(startPos, velocity, gravity, steps, timeStep)
     local points = {}
-    local timeStep = 0.1
     
     for i = 1, steps do
         local t = i * timeStep
         local displacement = velocity * t + 0.5 * gravity * t * t
         local position = startPos + displacement
-        table.insert(points, position)
+        
+        -- Проверяем коллизии
+        local ray = Ray.new(startPos, displacement)
+        local hit, hitPos = workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character, workspace.Ray_Ignore})
+        
+        if hit then
+            table.insert(points, hitPos)
+            break
+        else
+            table.insert(points, position)
+        end
     end
     
     return points
 end
 
 local function OnGrenadeThrown(grenade)
-    if not GrenadeTrajectory.Enabled then return end
+    if not GrenadeTrajectory.Enabled or not grenade:IsA("BasePart") then return end
     
     ClearTrajectory()
     
     local gravity = workspace.Gravity * Vector3.new(0, -1, 0)
-    local lastPos = grenade.Position
-    
     local conn
+    
     conn = RunService.Heartbeat:Connect(function()
-        if not grenade or not grenade.Parent then
+        if not grenade or not grenade.Parent or not GrenadeTrajectory.Enabled then
             conn:Disconnect()
             task.delay(2, ClearTrajectory)
             return
@@ -1139,18 +1549,26 @@ local function OnGrenadeThrown(grenade)
             grenade.Position,
             velocity,
             gravity,
-            50
+            30,
+            0.1
         )
         
+        -- Обновляем или создаем части траектории
         for i, point in ipairs(points) do
             if not GrenadeTrajectory.Parts[i] then
-                GrenadeTrajectory.Parts[i] = CreatePart()
+                GrenadeTrajectory.Parts[i] = CreateTrajectoryPart()
             end
             GrenadeTrajectory.Parts[i].Position = point
             GrenadeTrajectory.Parts[i].Parent = workspace
         end
         
-        lastPos = grenade.Position
+        -- Удаляем лишние части
+        for i = #points + 1, #GrenadeTrajectory.Parts do
+            if GrenadeTrajectory.Parts[i] then
+                GrenadeTrajectory.Parts[i]:Destroy()
+                GrenadeTrajectory.Parts[i] = nil
+            end
+        end
     end)
 end
 
@@ -1163,10 +1581,17 @@ local function toggleGrenadeTrajectory(state)
         end
         
         GrenadeTrajectory.Connection = workspace.ChildAdded:Connect(function(child)
-            if child.Name == "Grenade" then
+            if child.Name == "Grenade" and child:IsA("BasePart") then
                 OnGrenadeThrown(child)
             end
         end)
+        
+        -- Проверяем существующие гранаты
+        for _, child in ipairs(workspace:GetChildren()) do
+            if child.Name == "Grenade" and child:IsA("BasePart") then
+                OnGrenadeThrown(child)
+            end
+        end
     else
         if GrenadeTrajectory.Connection then
             GrenadeTrajectory.Connection:Disconnect()
@@ -1175,7 +1600,6 @@ local function toggleGrenadeTrajectory(state)
         ClearTrajectory()
     end
 end
-
 -- ================================
 -- MODULE REGISTRATION
 -- ================================
@@ -1281,9 +1705,97 @@ UmbrellaHub.api:registerModule("Utility", {
     end
 })
 
+UmbrellaHub.api:registerModule("Combat", {
+    name = "Penetration",
+    enabled = false,
+    callback = function(enabled)
+        togglePenetration(enabled)
+    end
+})
+
+UmbrellaHub.api:registerModule("Combat", {
+    name = "Infinite Ammo",
+    enabled = false,
+    callback = function(enabled)
+        toggleInfiniteAmmo(enabled)
+    end
+})
+
+-- Регистрация модуля Rapid Fire
+UmbrellaHub.api:registerModule("Combat", {
+    name = "Rapid Fire",
+    enabled = false,
+    callback = function(enabled)
+        toggleRapidFire(enabled)
+    end
+})
+
+
 -- ================================
 -- SETTINGS REGISTRATION
 -- ================================
+
+UmbrellaHub.api:registerSettings("Penetration", {
+    {
+        name = "Max Penetration",
+        type = "slider",
+        min = 50,
+        max = 200,
+        default = 100,
+        callback = function(value)
+            PenetrationModule.maxPenetration = value
+        end
+    },
+    {
+        name = "Max Obstacles",
+        type = "slider",
+        min = 1,
+        max = 8,
+        default = 4,
+        callback = function(value)
+            PenetrationModule.maxObstacles = value
+        end
+    }
+})
+
+-- Настройки Infinite Ammo
+UmbrellaHub.api:registerSettings("Infinite Ammo", {
+    {
+        name = "Primary Ammo",
+        type = "slider",
+        min = 100,
+        max = 999999,
+        default = 999999,
+        callback = function(value)
+            -- Значение устанавливается автоматически в модуле
+        end
+    },
+    {
+        name = "Secondary Ammo",
+        type = "slider",
+        min = 100,
+        max = 999999,
+        default = 999999,
+        callback = function(value)
+            -- Значение устанавливается автоматически в модуле
+        end
+    }
+})
+
+-- Настройки Rapid Fire
+UmbrellaHub.api:registerSettings("Rapid Fire", {
+    {
+        name = "Fire Rate Multiplier",
+        type = "slider",
+        min = 1,
+        max = 10,
+        default = 5,
+        isPercentage = false,
+        callback = function(value)
+            RapidFireModule.fireRateMultiplier = value
+        end
+    }
+})
 
 -- Auto Bhop Settings
 UmbrellaHub.api:registerSettings("Auto Bhop", {
@@ -1561,8 +2073,11 @@ UmbrellaHub.api:registerSettings("Bomb ESP", {
         default = true,
         callback = function(value)
             BombESPModule.showText = value
-            if BombESPModule.textLabel then
-                BombESPModule.textLabel.Visible = value
+            -- Обновляем видимость текста для всех бомб
+            for bomb, labels in pairs(BombESPModule.textLabels) do
+                if bomb and bomb.Parent and labels[4] then
+                    labels[4].Enabled = value
+                end
             end
         end
     },
@@ -1575,8 +2090,10 @@ UmbrellaHub.api:registerSettings("Bomb ESP", {
         isPercentage = true,
         callback = function(value)
             BombESPModule.transparency = value / 100
-            if BombESPModule.highlight then
-                BombESPModule.highlight.FillTransparency = BombESPModule.transparency
+            for bomb, highlight in pairs(BombESPModule.highlights) do
+                if bomb and bomb.Parent then
+                    highlight.FillTransparency = BombESPModule.transparency
+                end
             end
         end
     }
@@ -1594,7 +2111,9 @@ UmbrellaHub.api:registerSettings("Grenade Trajectory", {
         callback = function(value)
             GrenadeTrajectory.Transparency = value / 100
             for _, part in ipairs(GrenadeTrajectory.Parts) do
-                part.Transparency = GrenadeTrajectory.Transparency
+                if part then
+                    part.Transparency = GrenadeTrajectory.Transparency
+                end
             end
         end
     },
@@ -1607,7 +2126,9 @@ UmbrellaHub.api:registerSettings("Grenade Trajectory", {
         callback = function(value)
             GrenadeTrajectory.Thickness = value
             for _, part in ipairs(GrenadeTrajectory.Parts) do
-                part.Size = Vector3.new(value, value, value)
+                if part then
+                    part.Size = Vector3.new(value, value, value)
+                end
             end
         end
     }
