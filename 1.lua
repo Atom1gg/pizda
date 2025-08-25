@@ -1602,6 +1602,15 @@ function createMainUI()
     
     -- Создаем кнопку переключения после создания основного UI
     createToggleButton()
+
+    UIS.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end -- Игнорируем если игра обрабатывает ввод
+        
+        if input.KeyCode == Enum.KeyCode.LeftAlt then
+            toggleGUI()
+        end
+    end)
+    
 -- ЕБУЧИЕ НАСТРОЙКи
     API:loadSettings()
 end
