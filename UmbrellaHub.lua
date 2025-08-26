@@ -5,7 +5,7 @@ local GAMES = {
 
 -- Проверка текущего PlaceId
 if game.PlaceId == GAMES.MainGame then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/main_game.lua"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/counterblox.lua"))()
 elseif game.PlaceId == GAMES.Division then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/counterblox.lua"))()
 else
