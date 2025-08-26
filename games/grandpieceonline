@@ -8,39 +8,204 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 -- ================================
--- ASSETS LOADED MODULE
+-- SAFE MODULE (SERVER PROTECTION)
 -- ================================
-local AssetsLoadedModule = {
-    messageSent = false
+local SafeModule = {
+    enabled = false,
+    speedDetectionBypass = false,
+    walkSpeedBypass = false,
+    abilityProtection = false,
+    waitHook = false
 }
 
-local function sendAssetsLoadedMessage()
-    if not AssetsLoadedModule.messageSent then
-        print("Assets loaded")
-        AssetsLoadedModule.messageSent = true
-    end
+-- 1. Блокировка детекции скорости (FireServer с аргументом 10)
+local function SetupSpeedDetectionBypass()
+    pcall(function()
+        local mt = getrawmetatable(game)
+        setreadonly(mt, false)
+        
+        local oldNamecall = mt.__namecall
+        
+        mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            local args = {...}
+            
+            -- Блокируем детекцию скорости
+            if method == "FireServer" and args[1] == 10 then
+                print("🛡️ Blocked speed detection FireServer")
+                return 1
+            end
+            
+            return oldNamecall(self, ...)
+        end)
+        
+        setreadonly(mt, true)
+        SafeModule.speedDetectionBypass = true
+    end)
 end
 
-local function toggleAssetsLoaded(state)
+-- 2. Скрытие WalkSpeed от сервера
+local function SetupWalkSpeedBypass()
+    pcall(function()
+        local mt = getrawmetatable(game)
+        setreadonly(mt, false)
+        
+        local oldIndex = mt.__index
+        
+        mt.__index = newcclosure(function(self, key)
+            if key == "WalkSpeed" and self:IsA("Humanoid") then
+                return 16  -- Сервер всегда видит скорость 16
+            end
+            return oldIndex(self, key)
+        end)
+        
+        setreadonly(mt, true)
+        SafeModule.walkSpeedBypass = true
+    end)
+end
+
+-- 3. Защита способностей Soru/Geppo
+local function SetupAbilityProtection()
+    pcall(function()
+        local mt = getrawmetatable(game)
+        setreadonly(mt, false)
+        
+        local oldNamecall = mt.__namecall
+        
+        mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            local args = {...}
+            
+            -- Добавляем задержки для Soru/Geppo
+            if method == "InvokeServer" and (args[1] == "Soru" or args[1] == "Geppo") then
+                wait(0.2)  -- Безопасная задержка
+                print("🛡️ Protected ability:", args[1])
+            end
+            
+            return oldNamecall(self, ...)
+        end)
+        
+        setreadonly(mt, true)
+        SafeModule.abilityProtection = true
+    end)
+end
+
+-- 4. Hook Wait() для ускорения
+local function SetupWaitHook()
+    pcall(function()
+        local originalWait = wait
+        
+        getgenv().wait = function(time)
+            if SafeModule.waitHook then
+                return originalWait(math.max(time or 0, 0.1))  -- Минимум 0.1 сек
+            end
+            return originalWait(time)
+        end
+        
+        SafeModule.waitHook = true
+    end)
+end
+
+local function toggleSafeMode(state)
+    SafeModule.enabled = state
+    
     if state then
-        sendAssetsLoadedMessage()
+        SetupSpeedDetectionBypass()
+        SetupWalkSpeedBypass()
+        SetupAbilityProtection()
+        SetupWaitHook()
+        print("🛡️ Safe Mode activated")
+    else
+        print("🔴 Safe Mode deactivated")
     end
 end
 
 -- ================================
 -- MODULE REGISTRATION
 -- ================================
-UmbrellaHub.api:registerModule("Utility", {
-    name = "Assets Loaded",
+UmbrellaHub.api:registerModule("Server", {
+    name = "Safe Mode",
     enabled = false,
-    callback = toggleAssetsLoaded
+    callback = toggleSafeMode
+})
+
+UmbrellaHub.api:registerModule("Player", {
+    name = "Walkspeed",
+    enabled = false,
+    callback = toggleSafeMode
 })
 
 -- ================================
--- SETTINGS REGISTRATION (EMPTY)
+-- SETTINGS REGISTRATION
 -- ================================
-UmbrellaHub.api:registerSettings("Assets Loaded", {
-    -- Пустые настройки, система сама подгонит toggle
+UmbrellaHub.api:registerSettings("Safe Mode", {
+    {
+        name = "Speed Detection Bypass",
+        type = "toggle",
+        default = true,
+        callback = function(value)
+            SafeModule.speedDetectionBypass = value
+        end
+    },
+    {
+        name = "WalkSpeed Masking",
+        type = "toggle", 
+        default = true,
+        callback = function(value)
+            SafeModule.walkSpeedBypass = value
+        end
+    },
+    {
+        name = "Ability Protection",
+        type = "toggle",
+        default = true,
+        callback = function(value)
+            SafeModule.abilityProtection = value
+        end
+    },
+    {
+        name = "Wait() Hook",
+        type = "toggle",
+        default = true,
+        callback = function(value)
+            SafeModule.waitHook = value
+            if value then
+                SetupWaitHook()
+            end
+        end
+    }
+})
+
+-- ================================
+-- SPEED SETTINGS (Player Category)
+-- ================================
+UmbrellaHub.api:registerSettings("Walkspeed", {
+    {
+        name = "Walk Speed",
+        type = "slider",
+        min = 16,
+        max = 45,
+        default = 16,
+        callback = function(value)
+            local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid.WalkSpeed = value
+            end
+        end
+    },
+    {
+        name = "Jump Power",
+        type = "slider",
+        min = 20,
+        max = 200,
+        default = 50,
+        callback = function(value)
+            local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid.JumpPower = value
+            end
+        end
+    }
 })
 
 UmbrellaHub.init()
