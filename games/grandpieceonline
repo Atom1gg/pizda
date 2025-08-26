@@ -1,0 +1,46 @@
+-- Umbrella Hub
+local UI_LIB_URL = 'https://github.com/Atom1gg/pizda/raw/refs/heads/main/1.lua'
+local UmbrellaHub = loadstring(game:HttpGet(UI_LIB_URL))()
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- ================================
+-- ASSETS LOADED MODULE
+-- ================================
+local AssetsLoadedModule = {
+    messageSent = false
+}
+
+local function sendAssetsLoadedMessage()
+    if not AssetsLoadedModule.messageSent then
+        print("Assets loaded")
+        AssetsLoadedModule.messageSent = true
+    end
+end
+
+local function toggleAssetsLoaded(state)
+    if state then
+        sendAssetsLoadedMessage()
+    end
+end
+
+-- ================================
+-- MODULE REGISTRATION
+-- ================================
+UmbrellaHub.api:registerModule("Utility", {
+    name = "Assets Loaded",
+    enabled = false,
+    callback = toggleAssetsLoaded
+})
+
+-- ================================
+-- SETTINGS REGISTRATION (EMPTY)
+-- ================================
+UmbrellaHub.api:registerSettings("Assets Loaded", {
+    -- Пустые настройки, система сама подгонит toggle
+})
+
+UmbrellaHub.init()
