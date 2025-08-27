@@ -1,13 +1,13 @@
 local GAMES = {
-    MainGame = 1480424328, -- Главная игра
-    Division = 301549746,  -- Подразделение (Counter Blox)
+    [1480424328] = "https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/counterblox.lua", -- counterblox unranked
+    [301549746]  = "https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/counterblox.lua", -- counterblox 
+    [6360478118] = "https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/grandpieceonline", -- gpo universe hub
+    [11424731604] = "https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/grandpieceonline", -- gpo battle royale
 }
 
--- Проверка текущего PlaceId
-if game.PlaceId == GAMES.MainGame then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/counterblox.lua"))()
-elseif game.PlaceId == GAMES.Division then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/counterblox.lua"))()
+local scriptUrl = GAMES[game.PlaceId]
+if scriptUrl then
+    loadstring(game:HttpGet(scriptUrl))()
 else
-    return
+    game.Players.LocalPlayer:Kick("UmbrellaHub does not support this game.")
 end
