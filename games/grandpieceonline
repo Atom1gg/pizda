@@ -15,10 +15,14 @@ local SafeModule = {
     speedDetectionBypass = false,
     walkSpeedBypass = false,
     abilityProtection = false,
-    waitHook = false
+    waitHook = false,
+    -- Сохраняем оригинальные функции для восстановления
+    originalWait = nil,
+    originalMetatable = nil
 }
 
 local function SetupSpeedDetectionBypass()
+    if SafeModule.speedDetectionBypass then return end
     pcall(function()
         local mt = getrawmetatable(game)
         setreadonly(mt,false)
@@ -27,7 +31,6 @@ local function SetupSpeedDetectionBypass()
             local method = getnamecallmethod()
             local args = {...}
             if method=="FireServer" and args[1]==10 then
-                print("🛡️ Blocked speed detection FireServer")
                 return 1
             end
             return oldNamecall(self,...)
@@ -38,6 +41,7 @@ local function SetupSpeedDetectionBypass()
 end
 
 local function SetupWalkSpeedBypass()
+    if SafeModule.walkSpeedBypass then return end
     pcall(function()
         local mt = getrawmetatable(game)
         setreadonly(mt,false)
@@ -52,6 +56,7 @@ local function SetupWalkSpeedBypass()
 end
 
 local function SetupAbilityProtection()
+    if SafeModule.abilityProtection then return end
     pcall(function()
         local mt = getrawmetatable(game)
         setreadonly(mt,false)
@@ -61,7 +66,6 @@ local function SetupAbilityProtection()
             local args = {...}
             if method=="InvokeServer" and (args[1]=="Soru" or args[1]=="Geppo") then
                 wait(0.2)
-                print("🛡️ Protected ability:", args[1])
             end
             return oldNamecall(self,...)
         end)
@@ -71,26 +75,48 @@ local function SetupAbilityProtection()
 end
 
 local function SetupWaitHook()
+    if SafeModule.waitHook then return end
     pcall(function()
-        local originalWait=wait
+        if not SafeModule.originalWait then
+            SafeModule.originalWait = wait
+        end
         getgenv().wait=function(time)
-            if SafeModule.waitHook then return originalWait(math.max(time or 0,0.1)) end
-            return originalWait(time)
+            if SafeModule.enabled then 
+                return SafeModule.originalWait(math.max(time or 0,0.1)) 
+            end
+            return SafeModule.originalWait(time)
         end
         SafeModule.waitHook=true
     end)
 end
 
+local function DisableSafeMode()
+    -- Восстанавливаем wait функцию
+    if SafeModule.originalWait then
+        getgenv().wait = SafeModule.originalWait
+    end
+    
+    -- Сбрасываем флаги
+    SafeModule.speedDetectionBypass = false
+    SafeModule.walkSpeedBypass = false
+    SafeModule.abilityProtection = false
+    SafeModule.waitHook = false
+end
+
 local function toggleSafeMode(state)
-    SafeModule.enabled=state
+    SafeModule.enabled = state
+    
     if state then
+        -- Включаем все защиты
         SetupSpeedDetectionBypass()
         SetupWalkSpeedBypass()
         SetupAbilityProtection()
         SetupWaitHook()
-        print("🛡️ Safe Mode activated")
+        print("[Safe Mode] Включен - все защиты активированы")
     else
-        print("🔴 Safe Mode deactivated")
+        -- Отключаем защиты
+        DisableSafeMode()
+        print("[Safe Mode] Отключен")
     end
 end
 
@@ -134,7 +160,7 @@ local function ToggleWalkspeed(state)
 end
 
 -- ================================
--- CHEST ESP MODULE (добавлено в категорию World)
+-- CHEST ESP MODULE (Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ð¾ Ð² ÐºÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸ÑŽ World)
 -- ================================
 local ChestESP = {
     Enabled = false,
@@ -351,18 +377,16 @@ end
 local function ToggleChestESP(state)
     ChestESP.Enabled = state
     if state then
-        print("📦 Chest ESP включен")
     else
         for chestId, drawings in pairs(chestDrawings) do
             for _, drawing in pairs(drawings) do 
                 drawing.Visible = false 
             end
         end
-        print("📦 Chest ESP выключен")
     end
 end
 
--- Запускаем циклы
+-- Ð—Ð°Ð¿ÑƒÑÐºÐ°ÐµÐ¼ Ñ†Ð¸ÐºÐ»Ñ‹
 spawn(function()
     while true do
         if ChestESP.Enabled and effects then
@@ -402,29 +426,23 @@ UserInputService.JumpRequest:Connect(function()
         if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
     end
 end)
-
 -- ================================
--- ИСПРАВЛЕННЫЙ ESP MODULE С НОВЫМИ ФИЧАМИ
+-- ИСПРАВЛЕННЫЙ ESP MODULE С ТВОЕЙ ЛОГИКОЙ
 -- ================================
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Camera = workspace.CurrentCamera
-local LocalPlayer = Players.LocalPlayer
-
 local ESP = {
     Enabled = false,
     ShowPlayers = true,
     ShowFruits = true,
     ShowName = true,
     ShowHealthBar = true,
-    ShowPlayerBox = true, -- НОВОЕ: желтый квадрат у игрока
+    ShowPlayerBox = true, -- твоя фича с желтым квадратом
     Thickness = 1
 }
 
 local drawings = {}
 local playerConnections = {}
 
--- Цвета по rarity
+-- Цвета по rarity (твоя логика)
 local FruitRarityColors = {
     ["Common"] = Color3.fromRGB(255,255,255),
     ["Rare"] = Color3.fromRGB(173,216,230),
@@ -470,7 +488,7 @@ end
 local function CleanPlayerDrawings(playerName)
     for key, drawing in pairs(drawings) do
         if string.find(key, playerName) then
-            drawing:Remove()
+            pcall(function() drawing:Remove() end)
             drawings[key] = nil
         end
     end
@@ -478,278 +496,309 @@ end
 
 local function GetPlayerFruits(player)
     local fruits = {}
-    local backpack = player:FindFirstChild("Backpack")
-    if backpack then
-        for fruitName, rarity in pairs(Fruits) do
-            local fruit = backpack:FindFirstChild(fruitName)
-            if fruit then
-                table.insert(fruits, {name = fruitName, rarity = rarity})
+    pcall(function()
+        local backpack = player:FindFirstChild("Backpack")
+        if backpack then
+            for fruitName, rarity in pairs(Fruits) do
+                local fruit = backpack:FindFirstChild(fruitName)
+                if fruit then
+                    table.insert(fruits, {name = fruitName, rarity = rarity})
+                end
             end
         end
-    end
-    if player.Character then
-        for fruitName, rarity in pairs(Fruits) do
-            local fruit = player.Character:FindFirstChild(fruitName)
-            if fruit then
-                table.insert(fruits, {name = fruitName .. " (E)", rarity = rarity})
+        if player.Character then
+            for fruitName, rarity in pairs(Fruits) do
+                local fruit = player.Character:FindFirstChild(fruitName)
+                if fruit then
+                    table.insert(fruits, {name = fruitName .. " (E)", rarity = rarity})
+                end
             end
         end
-    end
+    end)
     return fruits
 end
 
--- НОВАЯ ФУНКЦИЯ: Получение bounding box для игрока
+-- ТВОЯ ФУНКЦИЯ: Получение bounding box для игрока (ИСПРАВЛЕННАЯ)
 local function GetPlayerBoundingBox(character)
-    local parts = {}
-    for _, part in pairs(character:GetChildren()) do
-        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-            table.insert(parts, part)
+    local success, result = pcall(function()
+        local parts = {}
+        for _, part in pairs(character:GetChildren()) do
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                table.insert(parts, part)
+            end
         end
-    end
-    
-    if #parts == 0 then return nil end
-    
-    local minX, minY, minZ = math.huge, math.huge, math.huge
-    local maxX, maxY, maxZ = -math.huge, -math.huge, -math.huge
-    
-    for _, part in pairs(parts) do
-        local cf = part.CFrame
-        local size = part.Size / 2
         
-        local corners = {
-            cf * Vector3.new(size.X, size.Y, size.Z),
-            cf * Vector3.new(-size.X, size.Y, size.Z),
-            cf * Vector3.new(size.X, -size.Y, size.Z),
-            cf * Vector3.new(size.X, size.Y, -size.Z),
-            cf * Vector3.new(-size.X, -size.Y, size.Z),
-            cf * Vector3.new(-size.X, size.Y, -size.Z),
-            cf * Vector3.new(size.X, -size.Y, -size.Z),
-            cf * Vector3.new(-size.X, -size.Y, -size.Z)
-        }
+        if #parts == 0 then return nil end
         
-        for _, corner in pairs(corners) do
-            minX = math.min(minX, corner.X)
-            minY = math.min(minY, corner.Y)
-            minZ = math.min(minZ, corner.Z)
-            maxX = math.max(maxX, corner.X)
-            maxY = math.max(maxY, corner.Y)
-            maxZ = math.max(maxZ, corner.Z)
+        local minX, minY, minZ = math.huge, math.huge, math.huge
+        local maxX, maxY, maxZ = -math.huge, -math.huge, -math.huge
+        
+        for _, part in pairs(parts) do
+            if part and part.Parent then -- дополнительная проверка
+                local cf = part.CFrame
+                local size = part.Size / 2
+                
+                local corners = {
+                    cf * Vector3.new(size.X, size.Y, size.Z),
+                    cf * Vector3.new(-size.X, size.Y, size.Z),
+                    cf * Vector3.new(size.X, -size.Y, size.Z),
+                    cf * Vector3.new(size.X, size.Y, -size.Z),
+                    cf * Vector3.new(-size.X, -size.Y, size.Z),
+                    cf * Vector3.new(-size.X, size.Y, -size.Z),
+                    cf * Vector3.new(size.X, -size.Y, -size.Z),
+                    cf * Vector3.new(-size.X, -size.Y, -size.Z)
+                }
+                
+                for _, corner in pairs(corners) do
+                    minX = math.min(minX, corner.X)
+                    minY = math.min(minY, corner.Y)
+                    minZ = math.min(minZ, corner.Z)
+                    maxX = math.max(maxX, corner.X)
+                    maxY = math.max(maxY, corner.Y)
+                    maxZ = math.max(maxZ, corner.Z)
+                end
+            end
         end
+        
+        local center = Vector3.new((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2)
+        local size = Vector3.new(maxX - minX, maxY - minY, maxZ - minZ)
+        
+        return center, size
+    end)
+    
+    if success then
+        return result
+    else
+        return nil
     end
-    
-    local center = Vector3.new((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2)
-    local size = Vector3.new(maxX - minX, maxY - minY, maxZ - minZ)
-    
-    return center, size
 end
 
 local function UpdateESP()
-    for _, d in pairs(drawings) do d.Visible = false end
-    if not ESP.Enabled then return end
+    pcall(function()
+        for _, d in pairs(drawings) do d.Visible = false end
+        if not ESP.Enabled then return end
 
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local char = player.Character
-            local head = char:FindFirstChild("Head")
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            
-            if not head or not hrp then continue end
-            
-            local headPos, headVisible = Camera:WorldToViewportPoint(head.Position)
-            if not headVisible or headPos.Z <= 0 then continue end
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                local char = player.Character
+                local head = char:FindFirstChild("Head")
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                
+                if not head or not hrp then continue end
+                
+                local headPos, headVisible = Camera:WorldToViewportPoint(head.Position)
+                if not headVisible or headPos.Z <= 0 then continue end
 
-            local rig = GetRigType(char)
-            local skeletonColor = Color3.fromRGB(255, 255, 0)
-            local yOffset = -45 -- ПОДНИМАЕМ НИК ВЫШЕ
+                local rig = GetRigType(char)
+                local skeletonColor = Color3.fromRGB(255, 255, 0)
+                local yOffset = -45 -- ПОДНЯЛИ НИК ВЫШЕ
 
-            -- НОВОЕ: Желтый квадрат вокруг игрока
-            if ESP.ShowPlayerBox then
-                local center, size = GetPlayerBoundingBox(char)
-                if center then
-                    local centerPos, centerVisible = Camera:WorldToViewportPoint(center)
-                    if centerVisible and centerPos.Z > 0 then
-                        -- Получаем углы bounding box
-                        local corners = {
-                            Camera:WorldToViewportPoint(center + Vector3.new(size.X/2, size.Y/2, size.Z/2)),
-                            Camera:WorldToViewportPoint(center + Vector3.new(-size.X/2, size.Y/2, size.Z/2)),
-                            Camera:WorldToViewportPoint(center + Vector3.new(size.X/2, -size.Y/2, size.Z/2)),
-                            Camera:WorldToViewportPoint(center + Vector3.new(size.X/2, size.Y/2, -size.Z/2)),
-                            Camera:WorldToViewportPoint(center + Vector3.new(-size.X/2, -size.Y/2, size.Z/2)),
-                            Camera:WorldToViewportPoint(center + Vector3.new(-size.X/2, size.Y/2, -size.Z/2)),
-                            Camera:WorldToViewportPoint(center + Vector3.new(size.X/2, -size.Y/2, -size.Z/2)),
-                            Camera:WorldToViewportPoint(center + Vector3.new(-size.X/2, -size.Y/2, -size.Z/2))
-                        }
-                        
-                        -- Рисуем контур bounding box
-                        for i = 1, 12 do
-                            local key = player.Name .. "_box_" .. i
+                -- ТВОЯ ЛОГИКА: Желтый квадрат вокруг игрока (ИСПРАВЛЕННАЯ)
+                if ESP.ShowPlayerBox then
+                    local center, size = GetPlayerBoundingBox(char)
+                    if center and size then
+                        local centerPos, centerVisible = Camera:WorldToViewportPoint(center)
+                        if centerVisible and centerPos.Z > 0 then
+                            -- Упрощенный bounding box - только основные линии
+                            local corners = {}
+                            pcall(function()
+                                corners = {
+                                    Camera:WorldToViewportPoint(center + Vector3.new(size.X/2, size.Y/2, 0)),
+                                    Camera:WorldToViewportPoint(center + Vector3.new(-size.X/2, size.Y/2, 0)),
+                                    Camera:WorldToViewportPoint(center + Vector3.new(size.X/2, -size.Y/2, 0)),
+                                    Camera:WorldToViewportPoint(center + Vector3.new(-size.X/2, -size.Y/2, 0))
+                                }
+                            end)
+                            
+                            -- Рисуем простой прямоугольник (4 линии)
+                            if #corners >= 4 then
+                                local boxLines = {
+                                    {1, 2}, {2, 4}, {4, 3}, {3, 1} -- соединяем углы
+                                }
+                                
+                                for i, line in ipairs(boxLines) do
+                                    local key = player.Name .. "_box_" .. i
+                                    if not drawings[key] then
+                                        drawings[key] = CreateDrawing("Line", {
+                                            Thickness = 2,
+                                            Color = Color3.fromRGB(255, 255, 0),
+                                            Visible = false
+                                        })
+                                    end
+                                    
+                                    local p1, p2 = corners[line[1]], corners[line[2]]
+                                    if p1 and p2 then
+                                        drawings[key].From = Vector2.new(p1.X, p1.Y)
+                                        drawings[key].To = Vector2.new(p2.X, p2.Y)
+                                        drawings[key].Visible = true
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+
+                -- Skeleton ESP
+                if ESP.ShowPlayers then
+                    local bones = (rig == Enum.HumanoidRigType.R15) and R15_BONES or R6_BONES
+                    for i, pair in ipairs(bones) do
+                        local p1 = char:FindFirstChild(pair[1])
+                        local p2 = char:FindFirstChild(pair[2])
+                        if p1 and p2 then
+                            local key = player.Name .. "_bone_" .. i
                             if not drawings[key] then
                                 drawings[key] = CreateDrawing("Line", {
-                                    Thickness = 2,
-                                    Color = Color3.fromRGB(255, 255, 0),
+                                    Thickness = ESP.Thickness,
+                                    Color = skeletonColor,
                                     Visible = false
                                 })
                             end
-                            -- Упрощенная отрисовка куба (можно доработать)
-                            if i == 1 then
-                                drawings[key].From = Vector2.new(corners[1].X, corners[1].Y)
-                                drawings[key].To = Vector2.new(corners[2].X, corners[2].Y)
-                            elseif i == 2 then
-                                drawings[key].From = Vector2.new(corners[1].X, corners[1].Y)
-                                drawings[key].To = Vector2.new(corners[3].X, corners[3].Y)
+                            local pos1, on1 = Camera:WorldToViewportPoint(p1.Position)
+                            local pos2, on2 = Camera:WorldToViewportPoint(p2.Position)
+                            if on1 and on2 and pos1.Z > 0 and pos2.Z > 0 then
+                                drawings[key].From = Vector2.new(pos1.X, pos1.Y)
+                                drawings[key].To = Vector2.new(pos2.X, pos2.Y)
+                                drawings[key].Visible = true
                             end
-                            drawings[key].Visible = true
                         end
                     end
                 end
-            end
 
-            -- Skeleton ESP
-            if ESP.ShowPlayers then
-                local bones = (rig == Enum.HumanoidRigType.R15) and R15_BONES or R6_BONES
-                for _, pair in ipairs(bones) do
-                    local p1 = char:FindFirstChild(pair[1])
-                    local p2 = char:FindFirstChild(pair[2])
-                    if p1 and p2 then
-                        local key = player.Name .. "_bone_" .. pair[1] .. pair[2]
-                        if not drawings[key] then
-                            drawings[key] = CreateDrawing("Line", {
-                                Thickness = ESP.Thickness,
-                                Color = skeletonColor,
-                                Visible = false
-                            })
-                        end
-                        local pos1, on1 = Camera:WorldToViewportPoint(p1.Position)
-                        local pos2, on2 = Camera:WorldToViewportPoint(p2.Position)
-                        if on1 and on2 and pos1.Z > 0 and pos2.Z > 0 then
-                            drawings[key].From = Vector2.new(pos1.X, pos1.Y)
-                            drawings[key].To = Vector2.new(pos2.X, pos2.Y)
-                            drawings[key].Visible = true
-                        end
-                    end
-                end
-            end
-
-            -- Name ESP (ПОДНЯТ ВЫШЕ)
-            if ESP.ShowName then
-                local key = player.Name .. "_name"
-                if not drawings[key] then
-                    drawings[key] = CreateDrawing("Text", {
-                        Text = player.Name,
-                        Size = 18, -- УВЕЛИЧИЛИ НА 6 ПИКСЕЛЕЙ
-                        Color = skeletonColor,
-                        Center = true,
-                        Outline = true,
-                        OutlineColor = Color3.fromRGB(0, 0, 0),
-                        Visible = false
-                    })
-                end
-                drawings[key].Position = Vector2.new(headPos.X, headPos.Y + yOffset)
-                drawings[key].Visible = true
-                yOffset = yOffset - 22
-            end
-
-            -- Фрукты ESP
-            if ESP.ShowFruits then
-                local fruits = GetPlayerFruits(player)
-                for i, fruitData in ipairs(fruits) do
-                    local key = player.Name .. "_fruit_" .. i
+                -- Name ESP (ПОДНЯТ ВЫШЕ)
+                if ESP.ShowName then
+                    local key = player.Name .. "_name"
                     if not drawings[key] then
                         drawings[key] = CreateDrawing("Text", {
-                            Size = 16, -- УВЕЛИЧИЛИ РАЗМЕР
+                            Text = player.Name,
+                            Size = 18, -- УВЕЛИЧИЛИ НА 6 ПИКСЕЛЕЙ
+                            Color = skeletonColor,
                             Center = true,
                             Outline = true,
                             OutlineColor = Color3.fromRGB(0, 0, 0),
                             Visible = false
                         })
                     end
-                    drawings[key].Text = fruitData.name
-                    drawings[key].Color = FruitRarityColors[fruitData.rarity]
                     drawings[key].Position = Vector2.new(headPos.X, headPos.Y + yOffset)
                     drawings[key].Visible = true
-                    yOffset = yOffset - 20
+                    yOffset = yOffset - 22
                 end
-            end
 
-            -- Health Bar ESP (ПЕРЕМЕЩАЕМ ПОД ИГРОКА)
-            if ESP.ShowHealthBar then
-                local cur, max = GetPlayerHealth(char)
-                local pct = math.clamp(cur / max, 0, 1)
-                
-                -- Background (ПОД ИГРОКОМ)
-                local bgKey = player.Name .. "_hp_bg"
-                if not drawings[bgKey] then 
-                    drawings[bgKey] = CreateDrawing("Line", {
-                        Thickness = 6,
-                        Color = Color3.fromRGB(50, 50, 50),
-                        Visible = false
-                    })
+                -- ТВОЯ ЛОГИКА: Фрукты ESP
+                if ESP.ShowFruits then
+                    local fruits = GetPlayerFruits(player)
+                    if #fruits == 0 then
+                        -- Показываем [None] если нет фруктов
+                        local key = player.Name .. "_fruit_none"
+                        if not drawings[key] then
+                            drawings[key] = CreateDrawing("Text", {
+                                Size = 16,
+                                Center = true,
+                                Outline = true,
+                                OutlineColor = Color3.fromRGB(0, 0, 0),
+                                Visible = false
+                            })
+                        end
+                        drawings[key].Text = "[None]"
+                        drawings[key].Color = Color3.fromRGB(128, 128, 128) -- Серый цвет
+                        drawings[key].Position = Vector2.new(headPos.X, headPos.Y + yOffset)
+                        drawings[key].Visible = true
+                        yOffset = yOffset - 20
+                    else
+                        -- Показываем фрукты как обычно
+                        for i, fruitData in ipairs(fruits) do
+                            local key = player.Name .. "_fruit_" .. i
+                            if not drawings[key] then
+                                drawings[key] = CreateDrawing("Text", {
+                                    Size = 16, -- УВЕЛИЧИЛИ РАЗМЕР 
+                                    Center = true,
+                                    Outline = true,
+                                    OutlineColor = Color3.fromRGB(0, 0, 0),
+                                    Visible = false
+                                })
+                            end
+                            drawings[key].Text = fruitData.name
+                            drawings[key].Color = FruitRarityColors[fruitData.rarity] or Color3.fromRGB(255, 255, 255)
+                            drawings[key].Position = Vector2.new(headPos.X, headPos.Y + yOffset)
+                            drawings[key].Visible = true
+                            yOffset = yOffset - 20
+                        end
+                    end
                 end
-                drawings[bgKey].From = Vector2.new(headPos.X - 35, headPos.Y + 60) -- ПОД ИГРОКОМ
-                drawings[bgKey].To = Vector2.new(headPos.X - 35, headPos.Y + 120) -- ПОД ИГРОКОМ
-                drawings[bgKey].Visible = true
 
-                -- Health Fill (ПОД ИГРОКОМ)
-                local fillKey = player.Name .. "_hp_fill"
-                if not drawings[fillKey] then 
-                    drawings[fillKey] = CreateDrawing("Line", {
-                        Thickness = 3,
-                        Visible = false
-                    })
-                end
-                drawings[fillKey].From = Vector2.new(headPos.X - 35, headPos.Y + 120) -- ПОД ИГРОКОМ
-                drawings[fillKey].To = Vector2.new(headPos.X - 35, headPos.Y + 120 - 60 * pct) -- ПОД ИГРОКОМ
-                drawings[fillKey].Color = Color3.fromRGB(255 * (1 - pct), 255 * pct, 0)
-                drawings[fillKey].Visible = true
+                -- Health Bar ESP (ИМБОВЫЙ СТИЛЬ)
+                if ESP.ShowHealthBar then
+                    local cur, max = GetPlayerHealth(char)
+                    local pct = math.clamp(cur / max, 0, 1)
+                    
+                    -- Получаем позицию ног игрока
+                    local feetPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+                    
+                    -- HP бар горизонтальный по длине игрока
+                    local barWidth = 80 -- ширина бара
+                    local barHeight = 8 -- толщина бара
+                    
+                    -- Background бар (горизонтальный)
+                    local bgKey = player.Name .. "_hp_bg"
+                    if not drawings[bgKey] then 
+                        drawings[bgKey] = CreateDrawing("Line", {
+                            Thickness = barHeight,
+                            Color = Color3.fromRGB(50, 50, 50),
+                            Visible = false
+                        })
+                    end
+                    drawings[bgKey].From = Vector2.new(feetPos.X - barWidth/2, feetPos.Y + 20)
+                    drawings[bgKey].To = Vector2.new(feetPos.X + barWidth/2, feetPos.Y + 20)
+                    drawings[bgKey].Visible = true
 
-                -- Health Text (ПОД ИГРОКОМ)
-                local hpTextKey = player.Name .. "_hp_text"
-                if not drawings[hpTextKey] then 
-                    drawings[hpTextKey] = CreateDrawing("Text", {
-                        Size = 14,
-                        Color = Color3.fromRGB(255, 255, 255),
-                        Center = true,
-                        Outline = true,
-                        OutlineColor = Color3.fromRGB(0, 0, 0),
-                        Visible = false
-                    })
+                    -- Health Fill (горизонтальный)
+                    local fillKey = player.Name .. "_hp_fill"
+                    if not drawings[fillKey] then 
+                        drawings[fillKey] = CreateDrawing("Line", {
+                            Thickness = barHeight - 2,
+                            Visible = false
+                        })
+                    end
+                    local fillWidth = barWidth * pct
+                    drawings[fillKey].From = Vector2.new(feetPos.X - barWidth/2, feetPos.Y + 20)
+                    drawings[fillKey].To = Vector2.new(feetPos.X - barWidth/2 + fillWidth, feetPos.Y + 20)
+                    drawings[fillKey].Color = Color3.fromRGB(255 * (1 - pct), 255 * pct, 0)
+                    drawings[fillKey].Visible = true
+
+                    -- Health Text ПОД НОГАМИ (ИМБОВЫЙ ЭФФЕКТ)
+                    local hpTextKey = player.Name .. "_hp_text"
+                    if not drawings[hpTextKey] then 
+                        drawings[hpTextKey] = CreateDrawing("Text", {
+                            Size = 16,
+                            Color = Color3.fromRGB(255, 255, 255),
+                            Center = true,
+                            Outline = true,
+                            OutlineColor = Color3.fromRGB(0, 0, 0),
+                            Visible = false
+                        })
+                    end
+                    drawings[hpTextKey].Text = string.format("%d/%d HP", math.floor(cur), math.floor(max))
+                    drawings[hpTextKey].Position = Vector2.new(feetPos.X, feetPos.Y + 35) -- ПОД НОГАМИ
+                    drawings[hpTextKey].Visible = true
                 end
-                drawings[hpTextKey].Text = string.format("%d/%d", math.floor(cur), math.floor(max))
-                drawings[hpTextKey].Position = Vector2.new(headPos.X - 50, headPos.Y + 75) -- ПОД ИГРОКОМ
-                drawings[hpTextKey].Visible = true
             end
         end
-    end
+    end)
 end
 
--- Остальной код без изменений...
+-- ИСПРАВЛЕНЫ СОБЫТИЯ (без конфликтов)
 local function SetupPlayerEvents()
-    Players.PlayerRemoving:Connect(function(player)
-        CleanPlayerDrawings(player.Name)
-        if playerConnections[player] then
-            for _, connection in pairs(playerConnections[player]) do
-                connection:Disconnect()
-            end
-            playerConnections[player] = nil
-        end
-    end)
-    
-    Players.PlayerAdded:Connect(function(player)
-        playerConnections[player] = {}
-        local function onCharacterAdded(character)
-            wait(1)
+    pcall(function()
+        Players.PlayerRemoving:Connect(function(player)
             CleanPlayerDrawings(player.Name)
-        end
+            if playerConnections[player] then
+                for _, connection in pairs(playerConnections[player]) do
+                    connection:Disconnect()
+                end
+                playerConnections[player] = nil
+            end
+        end)
         
-        if player.Character then
-            onCharacterAdded(player.Character)
-        end
-        
-        table.insert(playerConnections[player], player.CharacterAdded:Connect(onCharacterAdded))
-    end)
-    
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and not playerConnections[player] then
+        Players.PlayerAdded:Connect(function(player)
             playerConnections[player] = {}
             local function onCharacterAdded(character)
                 wait(1)
@@ -757,16 +806,32 @@ local function SetupPlayerEvents()
             end
             
             if player.Character then
-                onCharacterAdded(player.Character)
+                spawn(function() onCharacterAdded(player.Character) end)
             end
             
             table.insert(playerConnections[player], player.CharacterAdded:Connect(onCharacterAdded))
+        end)
+        
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and not playerConnections[player] then
+                playerConnections[player] = {}
+                local function onCharacterAdded(character)
+                    wait(1)
+                    CleanPlayerDrawings(player.Name)
+                end
+                
+                if player.Character then
+                    spawn(function() onCharacterAdded(player.Character) end)
+                end
+                
+                table.insert(playerConnections[player], player.CharacterAdded:Connect(onCharacterAdded))
+            end
         end
-    end
+    end)
 end
 
 local espConnection
-function toggleESP(state)
+local function toggleESP(state)
     ESP.Enabled = state
     if state then
         SetupPlayerEvents()
@@ -786,79 +851,64 @@ function toggleESP(state)
         end
         playerConnections = {}
         
-        for _, d in pairs(drawings) do d:Remove() end
+        for _, d in pairs(drawings) do 
+            pcall(function() d:Remove() end) 
+        end
         drawings = {}
         print("🔍 ESP выключен")
     end
 end
-
-return {
-    toggle = toggleESP,
-    settings = ESP
-}
-
 -- ================================
 -- SIMPLE NOCLIP MODULE
 -- ================================
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
+local Noclip = false
+local NoclipConnection
 
-local NoClipModule = {
-    Enabled = false,
-    Connection = nil
-}
-
-local function NoClipLoop()
-    if not LocalPlayer.Character then return end
-    
-    -- Просто отключаем коллизию всех частей персонажа
-    for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
-        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-            part.CanCollide = false
-        end
-    end
-end
-
+-- Функция для включения/выключения NoClip
 local function ToggleNoClip(state)
-    NoClipModule.Enabled = state
+    Noclip = state
     
-    if state then
-        -- Включаем
-        if NoClipModule.Connection then NoClipModule.Connection:Disconnect() end
-        NoClipModule.Connection = RunService.Stepped:Connect(NoClipLoop)
-        print("👻 NoClip ON")
-    else
-        -- Выключаем
-        if NoClipModule.Connection then 
-            NoClipModule.Connection:Disconnect() 
-            NoClipModule.Connection = nil 
+    if Noclip then
+        
+        if NoclipConnection then
+            NoclipConnection:Disconnect()
         end
         
-        -- Включаем коллизию обратно
+        NoclipConnection = RunService.Stepped:Connect(function()
+            if LocalPlayer.Character then
+                for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+                    if v:IsA("BasePart") and v.CanCollide then
+                        v.CanCollide = false
+                    end
+                end
+            end
+        end)
+    else
+        if NoclipConnection then
+            NoclipConnection:Disconnect()
+            NoclipConnection = nil
+        end
+        
+        -- Восстанавливаем коллизии при выключении
         if LocalPlayer.Character then
-            for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
-                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                    part.CanCollide = true
+            for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.CanCollide = true
                 end
             end
         end
     end
 end
 
--- Обработка смены персонажа
-LocalPlayer.CharacterAdded:Connect(function()
-    wait(1) -- Ждем загрузки персонажа
-    if NoClipModule.Enabled then
-        -- Если ноуклип был включен, включаем его снова
-        ToggleNoClip(true)
-    end
-end)
-
 -- ================================
 -- REGISTER MODULES
 -- ================================
-UmbrellaHub.api:registerModule("Server",{name="Safe Mode",enabled=false,callback=toggleSafeMode})
+UmbrellaHub.api:registerModule("Server", {
+    name = "Safe Mode", 
+    enabled = false, 
+    callback = toggleSafeMode
+})
+
 UmbrellaHub.api:registerModule("Player",{name="Walkspeed",enabled=false,callback=ToggleWalkspeed})
 UmbrellaHub.api:registerModule("Player",{name="Jump Boost",enabled=false,callback=function(state) JumpBoostModule.Enabled=state end})
 UmbrellaHub.api:registerModule("Player",{name="Infinity Jump",enabled=false,callback=function(state) InfinityJumpModule.Enabled=state end})
@@ -880,10 +930,7 @@ UmbrellaHub.api:registerModule("World", {
 -- REGISTER SETTINGS
 -- ================================
 UmbrellaHub.api:registerSettings("Safe Mode",{
-    {name="Speed Detection Bypass",type="toggle",default=true,callback=function(v) SafeModule.speedDetectionBypass=v end},
-    {name="WalkSpeed Masking",type="toggle",default=true,callback=function(v) SafeModule.walkSpeedBypass=v end},
-    {name="Ability Protection",type="toggle",default=true,callback=function(v) SafeModule.abilityProtection=v end},
-    {name="Wait() Hook",type="toggle",default=true,callback=function(v) SafeModule.waitHook=v if v then SetupWaitHook() end end}
+
 })
 
 UmbrellaHub.api:registerSettings("Walkspeed",{
@@ -895,12 +942,12 @@ UmbrellaHub.api:registerSettings("Jump Boost",{
 })
 
 UmbrellaHub.api:registerSettings("NoClip", {
-    -- Здесь пусто, либа автоматически создаст toggle переключатель
+    -- Ð—Ð´ÐµÑÑŒ Ð¿ÑƒÑÑ‚Ð¾, Ð»Ð¸Ð±Ð° Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ ÑÐ¾Ð·Ð´Ð°ÑÑ‚ toggle Ð¿ÐµÑ€ÐµÐºÐ»ÑŽÑ‡Ð°Ñ‚ÐµÐ»ÑŒ
 })
 
--- Убрал лишний toggle для Infinity Jump (он уже управляется через модуль)
+-- Ð£Ð±Ñ€Ð°Ð» Ð»Ð¸ÑˆÐ½Ð¸Ð¹ toggle Ð´Ð»Ñ Infinity Jump (Ð¾Ð½ ÑƒÐ¶Ðµ ÑƒÐ¿Ñ€Ð°Ð²Ð»ÑÐµÑ‚ÑÑ Ñ‡ÐµÑ€ÐµÐ· Ð¼Ð¾Ð´ÑƒÐ»ÑŒ)
 UmbrellaHub.api:registerSettings("Infinity Jump",{
-    -- Настройки не нужны, так как модуль сам по себе toggle
+    -- ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸ Ð½Ðµ Ð½ÑƒÐ¶Ð½Ñ‹, Ñ‚Ð°Ðº ÐºÐ°Ðº Ð¼Ð¾Ð´ÑƒÐ»ÑŒ ÑÐ°Ð¼ Ð¿Ð¾ ÑÐµÐ±Ðµ toggle
 })
 
 UmbrellaHub.api:registerSettings("ESP",{
