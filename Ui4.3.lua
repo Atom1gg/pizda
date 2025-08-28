@@ -558,7 +558,7 @@ local function createDropDown(parent, setting, position)
 
     local dropDownButton = Instance.new("TextButton")
     dropDownButton.Size = UDim2.new(0, 120, 0, 30)
-    dropDownButton.Position = UDim2.new(0.6, -50, 0.5, -15)
+    dropDownButton.Position = UDim2.new(0.6, 300, 0.5, -15)
     dropDownButton.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
     dropDownButton.BorderSizePixel = 0
     dropDownButton.AutoButtonColor = false
