@@ -642,7 +642,7 @@ local function createDropDown(parent, setting, position)
     end
 
     -- закрыть меню
-    function frame.Close()
+    function frame:Close()
         if isOpen and not animating then
             animating = true
             isOpen = false
