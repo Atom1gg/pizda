@@ -750,44 +750,43 @@ local function createDropDown(parent, setting, position)
         optionsContainer.CanvasSize = UDim2.new(0, 0, 0, menuLayout.AbsoluteContentSize.Y + 4)
     end
 
-    function frame:Close()
-        if isOpen and not animating then
-            animating = true
-            isOpen = false
-            
-            -- Анимация закрытия - схлопывание в центр кнопки
-            local buttonAbsPos = dropDownButton.AbsolutePosition
-            local buttonAbsSize = dropDownButton.AbsoluteSize
-            local centerPos = UDim2.new(0, buttonAbsPos.X + buttonAbsSize.X/2, 0, buttonAbsPos.Y + buttonAbsSize.Y/2)
-            
-            local closeTween = TweenService:Create(dropDownMenu, 
-                TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), 
-                {
-                    Size = UDim2.new(0, 0, 0, 0),
-                    Position = centerPos
-                }
-            )
-            
-            local fadeTween = TweenService:Create(dropDownMenu, 
-                TweenInfo.new(0.2), 
-                {BackgroundTransparency = 1}
-            )
-            
-            local shadowFadeTween = TweenService:Create(shadow, 
-                TweenInfo.new(0.2), 
-                {BackgroundTransparency = 1}
-            )
-            
-            closeTween:Play()
-            fadeTween:Play()
-            shadowFadeTween:Play()
-            
-            closeTween.Completed:Connect(function()
-                dropDownMenu.Visible = false
-                animating = false
-            end)
-        end
+    function dropDownMenu:Close()
+    if isOpen and not animating then
+        animating = true
+        isOpen = false
+        
+        local buttonAbsPos = dropDownButton.AbsolutePosition
+        local buttonAbsSize = dropDownButton.AbsoluteSize
+        local centerPos = UDim2.new(0, buttonAbsPos.X + buttonAbsSize.X/2, 0, buttonAbsPos.Y + buttonAbsSize.Y/2)
+        
+        local closeTween = TweenService:Create(dropDownMenu, 
+            TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), 
+            {
+                Size = UDim2.new(0, 0, 0, 0),
+                Position = centerPos
+            }
+        )
+        
+        local fadeTween = TweenService:Create(dropDownMenu, 
+            TweenInfo.new(0.2), 
+            {BackgroundTransparency = 1}
+        )
+        
+        local shadowFadeTween = TweenService:Create(shadow, 
+            TweenInfo.new(0.2), 
+            {BackgroundTransparency = 1}
+        )
+        
+        closeTween:Play()
+        fadeTween:Play()
+        shadowFadeTween:Play()
+        
+        closeTween.Completed:Connect(function()
+            dropDownMenu.Visible = false
+            animating = false
+        end)
     end
+end
 
     local function openDropdown()
 if not isOpen and not animating then
