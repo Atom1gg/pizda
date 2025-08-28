@@ -541,6 +541,7 @@ local function createDropDown(parent, setting, position)
     frame.Size = UDim2.new(0, 280, 0, 50)
     frame.Position = position
     frame.BackgroundTransparency = 1
+    frame.ZIndex = 50  -- Базовый индекс для dropdown
     frame.Parent = parent
 
     local label = Instance.new("TextLabel")
@@ -552,6 +553,7 @@ local function createDropDown(parent, setting, position)
     label.TextSize = 22
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.BackgroundTransparency = 1
+    label.ZIndex = frame.ZIndex + 1  -- На 1 выше базового
     label.Parent = frame
 
     local dropDownButton = Instance.new("TextButton")
@@ -561,10 +563,12 @@ local function createDropDown(parent, setting, position)
     dropDownButton.BorderSizePixel = 0
     dropDownButton.AutoButtonColor = false
     dropDownButton.Text = ""
+    dropDownButton.ZIndex = frame.ZIndex + 2  -- На 2 выше базового
     dropDownButton.Parent = frame
 
     local buttonCorner = Instance.new("UICorner")
     buttonCorner.CornerRadius = UDim.new(0, 4)
+    buttonCorner.ZIndex = dropDownButton.ZIndex  -- Такой же как кнопка
     buttonCorner.Parent = dropDownButton
 
     local selectedText = Instance.new("TextLabel")
@@ -576,29 +580,33 @@ local function createDropDown(parent, setting, position)
     selectedText.Font = Enum.Font.SourceSans
     selectedText.TextSize = 16
     selectedText.TextXAlignment = Enum.TextXAlignment.Center
+    selectedText.ZIndex = dropDownButton.ZIndex + 1  -- На 1 выше кнопки
     selectedText.Parent = dropDownButton
 
-    -- ИСПРАВЛЕНИЕ: Создаем dropdown внутри основного UI
+    -- Dropdown menu (выпадающее меню)
     local dropDownMenu = Instance.new("Frame")
     dropDownMenu.BackgroundColor3 = Color3.fromRGB(25, 25, 27)
     dropDownMenu.BorderSizePixel = 0
     dropDownMenu.Visible = false
     dropDownMenu.ClipsDescendants = true
-    dropDownMenu.ZIndex = 50
-    dropDownMenu.Parent = _G.mainFrame.Parent -- Привязываем к screenGui
+    dropDownMenu.ZIndex = frame.ZIndex + 10  -- Самый высокий индекс для меню
+    dropDownMenu.Parent = _G.mainFrame.Parent
 
     local menuCorner = Instance.new("UICorner")
     menuCorner.CornerRadius = UDim.new(0, 6)
+    menuCorner.ZIndex = dropDownMenu.ZIndex  -- Такой же как меню
     menuCorner.Parent = dropDownMenu
 
     local optionsContainer = Instance.new("Frame")
     optionsContainer.Size = UDim2.new(1, 0, 1, 0)
     optionsContainer.BackgroundTransparency = 1
+    optionsContainer.ZIndex = dropDownMenu.ZIndex  -- Такой же как меню
     optionsContainer.Parent = dropDownMenu
 
     local layout = Instance.new("UIListLayout")
-    layout.Parent = optionsContainer
     layout.Padding = UDim.new(0, 2)
+    layout.ZIndex = optionsContainer.ZIndex  -- Такой же как контейнер
+    layout.Parent = optionsContainer
 
     local isOpen = false
     local animating = false
@@ -616,10 +624,12 @@ local function createDropDown(parent, setting, position)
             optionButton.TextColor3 = Color3.fromRGB(200, 200, 200)
             optionButton.Font = Enum.Font.SourceSans
             optionButton.TextSize = 16
+            optionButton.ZIndex = optionsContainer.ZIndex + 1  -- На 1 выше контейнера
             optionButton.Parent = optionsContainer
 
             local corner = Instance.new("UICorner")
             corner.CornerRadius = UDim.new(0, 4)
+            corner.ZIndex = optionButton.ZIndex  -- Такой же как кнопка опции
             corner.Parent = optionButton
 
             optionButton.MouseButton1Click:Connect(function()
