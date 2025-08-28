@@ -584,7 +584,7 @@ local function createDropDown(parent, setting, position)
 
     -- Dropdown menu - ФОН ДРОПДАУНА
     local dropDownMenu = Instance.new("Frame")
-    dropDownMenu.BackgroundColor3 = Color3.fromRGB(15, 15, 17) -- ЦВЕТ ФОНА ДРОПДАУНА
+    dropDownMenu.BackgroundColor3 = Color3.fromRGB(20, 20, 22) -- ЦВЕТ ФОНА ДРОПДАУНА
     dropDownMenu.BorderSizePixel = 0
     dropDownMenu.Visible = false
     dropDownMenu.ClipsDescendants = true
