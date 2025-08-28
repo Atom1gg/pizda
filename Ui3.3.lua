@@ -568,7 +568,6 @@ local function createDropDown(parent, setting, position)
 
     local buttonCorner = Instance.new("UICorner")
     buttonCorner.CornerRadius = UDim.new(0, 4)
-    buttonCorner.ZIndex = dropDownButton.ZIndex  -- Такой же как кнопка
     buttonCorner.Parent = dropDownButton
 
     local selectedText = Instance.new("TextLabel")
@@ -594,7 +593,6 @@ local function createDropDown(parent, setting, position)
 
     local menuCorner = Instance.new("UICorner")
     menuCorner.CornerRadius = UDim.new(0, 6)
-    menuCorner.ZIndex = dropDownMenu.ZIndex  -- Такой же как меню
     menuCorner.Parent = dropDownMenu
 
     local optionsContainer = Instance.new("Frame")
