@@ -567,7 +567,6 @@ local function createDropDown(parent, setting, position)
     dropDownCorner.CornerRadius = UDim.new(0, 4)
     dropDownCorner.Parent = dropDownButton
 
-    -- выбранное значение
     local selectedValue = setting.default or "Select..."
     local selectedText = Instance.new("TextLabel")
     selectedText.Size = UDim2.new(1, -10, 1, 0)
@@ -632,27 +631,23 @@ local function createDropDown(parent, setting, position)
                 selectedValue = option
                 selectedText.Text = option
                 if setting.callback then setting.callback(option) end
-                frame:Close()
+                frame:Close() -- ВАЖНО! Только через двоеточие
             end)
         end
     end
 
     function frame:Close()
         if isOpen and not animating then
-            animating = true
             isOpen = false
             dropDownMenu.Visible = false
-            animating = false
         end
     end
 
     local function openMenu()
         if not isOpen and not animating then
-            animating = true
             isOpen = true
             populateOptions()
             dropDownMenu.Visible = true
-            animating = false
         else
             frame:Close()
         end
@@ -660,8 +655,9 @@ local function createDropDown(parent, setting, position)
 
     dropDownButton.MouseButton1Click:Connect(openMenu)
 
-    return frame
+    -- ничего не возвращаем!
 end
+
 
 local function createTextField(parent, setting, position)
     local frame = Instance.new("Frame")
