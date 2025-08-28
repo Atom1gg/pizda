@@ -18,7 +18,6 @@ _G.mainUICreated = false
 local activeCategoryLabel
 local moduleNameLabel
 local slashLabel
-local openDropdowns = {}
 
 -- Настройки стиля для ключ системы
 local ACCENT_COLOR = Color3.fromRGB(255, 75, 75)
@@ -34,18 +33,6 @@ local API = {
     savedSettings = {},
     savedModuleStates = {}
 }
-
-local function closeAllDropdowns(except)
-    for _, dropdown in pairs(openDropdowns) do
-        if dropdown ~= except and dropdown.Close then
-            dropdown:Close()
-        end
-    end
-    openDropdowns = {}
-    if except then
-        table.insert(openDropdowns, except)
-    end
-end
 
 -- Система сохранения настроек с папкой пользователя
 local function getPlayerDataPath()
@@ -549,9 +536,6 @@ local function createScrollableContainer(parent, size, position, padding)
     return scrollFrame, container
 end
 
-local TweenService = game:GetService("TweenService")
-local player = game.Players.LocalPlayer
-
 local function createDropDown(parent, setting, position)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0, 280, 0, 50)
@@ -559,10 +543,11 @@ local function createDropDown(parent, setting, position)
     frame.BackgroundTransparency = 1
     frame.Parent = parent
 
+    -- Лейбл
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(0.6, 0, 1, 0)
     label.Position = UDim2.new(0, 10, 0, 0)
-    label.Text = setting.name
+    label.Text = setting.name or "Dropdown"
     label.TextColor3 = Color3.fromRGB(142, 142, 142)
     label.Font = Enum.Font.SourceSansBold
     label.TextSize = 22
@@ -570,6 +555,7 @@ local function createDropDown(parent, setting, position)
     label.BackgroundTransparency = 1
     label.Parent = frame
 
+    -- Кнопка
     local dropDownButton = Instance.new("TextButton")
     dropDownButton.Size = UDim2.new(0, 120, 0, 30)
     dropDownButton.Position = UDim2.new(0.6, 10, 0.5, -15)
@@ -579,187 +565,87 @@ local function createDropDown(parent, setting, position)
     dropDownButton.Text = ""
     dropDownButton.Parent = frame
 
-    local dropDownCorner = Instance.new("UICorner")
-    dropDownCorner.CornerRadius = UDim.new(0, 4)
-    dropDownCorner.Parent = dropDownButton
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(0, 4)
+    buttonCorner.Parent = dropDownButton
 
-    -- Загружаем сохранённое значение
-    local selectedValue = setting.default or "Select..."
-    if API.savedSettings[setting.moduleName] and API.savedSettings[setting.moduleName][setting.name] ~= nil then
-        selectedValue = API.savedSettings[setting.moduleName][setting.name]
-    end
-
+    -- Текст выбранной опции
     local selectedText = Instance.new("TextLabel")
     selectedText.Size = UDim2.new(1, -10, 1, 0)
     selectedText.Position = UDim2.new(0, 8, 0, 0)
     selectedText.BackgroundTransparency = 1
-    selectedText.Text = selectedValue
+    selectedText.Text = setting.default or "Select..."
     selectedText.TextColor3 = Color3.fromRGB(200, 200, 200)
     selectedText.Font = Enum.Font.SourceSans
     selectedText.TextSize = 16
     selectedText.TextXAlignment = Enum.TextXAlignment.Center
-    selectedText.TextTruncate = Enum.TextTruncate.AtEnd
     selectedText.Parent = dropDownButton
 
-    -- Дропдаун контейнер
+    -- Меню
     local dropDownMenu = Instance.new("Frame")
-    dropDownMenu.Name = "DropdownMenu"
     dropDownMenu.Size = UDim2.new(0, 0, 0, 0)
     dropDownMenu.BackgroundColor3 = Color3.fromRGB(25, 25, 27)
     dropDownMenu.BorderSizePixel = 0
-    dropDownMenu.ClipsDescendants = true
     dropDownMenu.Visible = false
-    dropDownMenu.ZIndex = 1000
+    dropDownMenu.ClipsDescendants = true
+    dropDownMenu.ZIndex = 50
     dropDownMenu.Parent = player.PlayerGui:FindFirstChild("MyUI")
-
-    local shadow = Instance.new("Frame")
-    shadow.Size = UDim2.new(1, 6, 1, 6)
-    shadow.Position = UDim2.new(0, -3, 0, -3)
-    shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    shadow.BackgroundTransparency = 0.7
-    shadow.ZIndex = dropDownMenu.ZIndex - 1
-    shadow.Parent = dropDownMenu
-
-    local shadowCorner = Instance.new("UICorner")
-    shadowCorner.CornerRadius = UDim.new(0, 8)
-    shadowCorner.Parent = shadow
 
     local menuCorner = Instance.new("UICorner")
     menuCorner.CornerRadius = UDim.new(0, 6)
     menuCorner.Parent = dropDownMenu
 
-    local optionsContainer = Instance.new("ScrollingFrame")
-    optionsContainer.Size = UDim2.new(1, -4, 1, -4)
-    optionsContainer.Position = UDim2.new(0, 2, 0, 2)
+    local optionsContainer = Instance.new("Frame")
+    optionsContainer.Size = UDim2.new(1, 0, 1, 0)
     optionsContainer.BackgroundTransparency = 1
-    optionsContainer.ScrollBarThickness = 0
-    optionsContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
     optionsContainer.Parent = dropDownMenu
 
-    local menuLayout = Instance.new("UIListLayout")
-    menuLayout.Padding = UDim.new(0, 2)
-    menuLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    menuLayout.VerticalAlignment = Enum.VerticalAlignment.Top
-    menuLayout.Parent = optionsContainer
+    local layout = Instance.new("UIListLayout")
+    layout.Parent = optionsContainer
+    layout.Padding = UDim.new(0, 2)
 
+    -- Состояние
     local isOpen = false
     local animating = false
 
-    local function calculateDropdownPosition()
-        local buttonAbsPos = dropDownButton.AbsolutePosition
-        local buttonAbsSize = dropDownButton.AbsoluteSize
-        local screenSize = workspace.CurrentCamera.ViewportSize
-
-        local dropdownWidth = 140
-        local dropdownHeight = math.min(#setting.options * 32 + 8, 200)
-
-        local buttonCenterX = buttonAbsPos.X + buttonAbsSize.X / 2
-        local buttonCenterY = buttonAbsPos.Y + buttonAbsSize.Y / 2
-
-        local spaceRight = screenSize.X - (buttonAbsPos.X + buttonAbsSize.X)
-        local spaceLeft = buttonAbsPos.X
-        local spaceDown = screenSize.Y - (buttonAbsPos.Y + buttonAbsSize.Y)
-        local spaceUp = buttonAbsPos.Y
-
-        local finalX, finalY
-        if spaceRight >= dropdownWidth then
-            finalX = buttonAbsPos.X + buttonAbsSize.X + 5
-        elseif spaceLeft >= dropdownWidth then
-            finalX = buttonAbsPos.X - dropdownWidth - 5
-        else
-            finalX = buttonCenterX - dropdownWidth / 2
-        end
-
-        if spaceDown >= dropdownHeight then
-            finalY = buttonAbsPos.Y
-        elseif spaceUp >= dropdownHeight then
-            finalY = buttonAbsPos.Y + buttonAbsSize.Y - dropdownHeight
-        else
-            finalY = buttonCenterY - dropdownHeight / 2
-        end
-
-        return UDim2.new(0, finalX, 0, finalY), UDim2.new(0, dropdownWidth, 0, dropdownHeight)
-    end
-
-    local function updateOptionsMenu()
+    -- Заполнение опциями
+    local function populateOptions()
         for _, child in ipairs(optionsContainer:GetChildren()) do
-            if child:IsA("TextButton") then
-                child:Destroy()
-            end
+            if child:IsA("TextButton") then child:Destroy() end
         end
 
-        for i, option in ipairs(setting.options) do
+        for _, option in ipairs(setting.options or {}) do
             local optionButton = Instance.new("TextButton")
-            optionButton.Size = UDim2.new(1, -6, 0, 28)
+            optionButton.Size = UDim2.new(1, -8, 0, 28)
             optionButton.BackgroundColor3 = Color3.fromRGB(30, 30, 32)
-            optionButton.BorderSizePixel = 0
-            optionButton.AutoButtonColor = false
             optionButton.Text = option
-            optionButton.Font = Enum.Font.SourceSans
             optionButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+            optionButton.Font = Enum.Font.SourceSans
             optionButton.TextSize = 16
-            optionButton.BackgroundTransparency = 0.3
             optionButton.Parent = optionsContainer
 
-            local optionCorner = Instance.new("UICorner")
-            optionCorner.CornerRadius = UDim.new(0, 4)
-            optionCorner.Parent = optionButton
-
-            optionButton.MouseEnter:Connect(function()
-                TweenService:Create(optionButton, TweenInfo.new(0.15), {
-                    BackgroundTransparency = 0,
-                    TextColor3 = Color3.fromRGB(255, 255, 255)
-                }):Play()
-            end)
-
-            optionButton.MouseLeave:Connect(function()
-                TweenService:Create(optionButton, TweenInfo.new(0.15), {
-                    BackgroundTransparency = 0.3,
-                    TextColor3 = Color3.fromRGB(200, 200, 200)
-                }):Play()
-            end)
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 4)
+            corner.Parent = optionButton
 
             optionButton.MouseButton1Click:Connect(function()
-                selectedValue = option
                 selectedText.Text = option
-
-                if not API.savedSettings[setting.moduleName] then
-                    API.savedSettings[setting.moduleName] = {}
-                end
-                API.savedSettings[setting.moduleName][setting.name] = option
-                saveSettings()
-
-                if setting.callback then
-                    setting.callback(option)
-                end
-
-                dropDownMenu:Close() -- фикс
+                if setting.callback then setting.callback(option) end
+                closeMenu()
             end)
         end
-
-        optionsContainer.CanvasSize = UDim2.new(0, 0, 0, menuLayout.AbsoluteContentSize.Y + 4)
     end
 
-    function dropDownMenu:Close()
+    -- Закрыть меню
+    function closeMenu()
         if isOpen and not animating then
             animating = true
             isOpen = false
 
-            local buttonAbsPos = dropDownButton.AbsolutePosition
-            local buttonAbsSize = dropDownButton.AbsoluteSize
-            local centerPos = UDim2.new(0, buttonAbsPos.X + buttonAbsSize.X/2, 0, buttonAbsPos.Y + buttonAbsSize.Y/2)
-
-            local closeTween = TweenService:Create(dropDownMenu, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-                Size = UDim2.new(0, 0, 0, 0),
-                Position = centerPos
+            local closeTween = TweenService:Create(dropDownMenu, TweenInfo.new(0.2), {
+                Size = UDim2.new(0, 0, 0, 0)
             })
-            local fadeTween = TweenService:Create(dropDownMenu, TweenInfo.new(0.2), { BackgroundTransparency = 1 })
-            local shadowTween = TweenService:Create(shadow, TweenInfo.new(0.2), { BackgroundTransparency = 1 })
-
             closeTween:Play()
-            fadeTween:Play()
-            shadowTween:Play()
-
             closeTween.Completed:Connect(function()
                 dropDownMenu.Visible = false
                 animating = false
@@ -767,65 +653,34 @@ local function createDropDown(parent, setting, position)
         end
     end
 
-    local function openDropdown()
+    -- Открыть меню
+    local function openMenu()
         if not isOpen and not animating then
             animating = true
             isOpen = true
 
-            closeAllDropdowns(frame)
-            updateOptionsMenu()
-
-            local finalPos, finalSize = calculateDropdownPosition()
-
-            local buttonAbsPos = dropDownButton.AbsolutePosition
-            local buttonAbsSize = dropDownButton.AbsoluteSize
-            local centerPos = UDim2.new(0, buttonAbsPos.X + buttonAbsSize.X/2, 0, buttonAbsPos.Y + buttonAbsSize.Y/2)
-
-            dropDownMenu.Position = centerPos
-            dropDownMenu.Size = UDim2.new(0, 0, 0, 0)
-            dropDownMenu.BackgroundTransparency = 1
-            shadow.BackgroundTransparency = 1
+            populateOptions()
             dropDownMenu.Visible = true
+            dropDownMenu.Size = UDim2.new(0, 0, 0, 0)
 
+            local targetSize = UDim2.new(0, 140, 0, math.min(#setting.options * 32, 200))
             local openTween = TweenService:Create(dropDownMenu, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = finalSize, Position = finalPos
+                Size = targetSize
             })
-            local fadeTween = TweenService:Create(dropDownMenu, TweenInfo.new(0.25), { BackgroundTransparency = 0 })
-            local shadowTween = TweenService:Create(shadow, TweenInfo.new(0.25), { BackgroundTransparency = 0.7 })
-
             openTween:Play()
-            fadeTween:Play()
-            shadowTween:Play()
-
             openTween.Completed:Connect(function()
                 animating = false
             end)
         elseif isOpen then
-            dropDownMenu:Close() -- фикс
+            closeMenu()
         end
     end
 
-    dropDownButton.MouseEnter:Connect(function()
-        if not isOpen then
-            TweenService:Create(dropDownButton, TweenInfo.new(0.15), {
-                BackgroundColor3 = Color3.fromRGB(28, 28, 30)
-            }):Play()
-        end
-    end)
-
-    dropDownButton.MouseLeave:Connect(function()
-        if not isOpen then
-            TweenService:Create(dropDownButton, TweenInfo.new(0.15), {
-                BackgroundColor3 = Color3.fromRGB(20, 20, 22)
-            }):Play()
-        end
-    end)
-
-    dropDownButton.MouseButton1Click:Connect(openDropdown)
+    -- Клик по кнопке
+    dropDownButton.MouseButton1Click:Connect(openMenu)
 
     return frame
 end
-
 
 local function createTextField(parent, setting, position)
     local frame = Instance.new("Frame")
