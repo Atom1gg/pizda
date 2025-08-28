@@ -626,7 +626,6 @@ local function createDropDown(parent, setting, position)
 
             local corner = Instance.new("UICorner")
             corner.CornerRadius = UDim.new(0, 4)
-            corner.ZIndex = optionButton.ZIndex  -- Такой же как кнопка опции
             corner.Parent = optionButton
 
             optionButton.MouseButton1Click:Connect(function()
