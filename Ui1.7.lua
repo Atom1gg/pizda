@@ -656,37 +656,41 @@ local function createDropDown(parent, setting, position)
     end
 
     local function openMenu()
-        if not isOpen and not animating then
-            animating = true
-            isOpen = true
+    if not isOpen and not animating then
+        animating = true
+        isOpen = true
 
-            populateOptions()
-            dropDownMenu.Visible = true
+        populateOptions()
+        dropDownMenu.Visible = true
 
-            local buttonPos = dropDownButton.AbsolutePosition
-            local buttonSize = dropDownButton.AbsoluteSize
-            local center = UDim2.new(0, buttonPos.X + buttonSize.X/2, 0, buttonPos.Y + buttonSize.Y/2)
+        local buttonAbsPos = dropDownButton.AbsolutePosition
+        local parentAbsPos = parent.AbsolutePosition
+        local buttonSize = dropDownButton.AbsoluteSize
 
-            local targetWidth = 140
-            local targetHeight = math.min(#setting.options * 32, 200)
+        -- 🔑 Центр кнопки, но уже в локальных координатах parent
+        local centerX = (buttonAbsPos.X - parentAbsPos.X) + buttonSize.X/2
+        local centerY = (buttonAbsPos.Y - parentAbsPos.Y) + buttonSize.Y/2
 
-            dropDownMenu.Size = UDim2.new(0, 0, 0, 0)
-            dropDownMenu.Position = center
+        local targetWidth = 140
+        local targetHeight = math.min(#setting.options * 32, 200)
 
-            local targetPos = UDim2.new(0, buttonPos.X + buttonSize.X/2 - targetWidth/2, 0, buttonPos.Y + buttonSize.Y/2 - targetHeight/2)
+        dropDownMenu.Size = UDim2.new(0, 0, 0, 0)
+        dropDownMenu.Position = UDim2.new(0, centerX, 0, centerY)
 
-            local tween = TweenService:Create(dropDownMenu, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.new(0, targetWidth, 0, targetHeight),
-                Position = targetPos
-            })
-            tween:Play()
-            tween.Completed:Connect(function()
-                animating = false
-            end)
-        else
-            closeMenu()
-        end
+        local targetPos = UDim2.new(0, centerX - targetWidth/2, 0, centerY - targetHeight/2)
+
+        local tween = TweenService:Create(dropDownMenu, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, targetWidth, 0, targetHeight),
+            Position = targetPos
+        })
+        tween:Play()
+        tween.Completed:Connect(function()
+            animating = false
+        end)
+    else
+        closeMenu()
     end
+end
 
     -- 🔑 обработка клика вне меню (закрытие)
     UserInputService.InputBegan:Connect(function(input, processed)
