@@ -578,13 +578,14 @@ local function createDropDown(parent, setting, position)
     selectedText.TextXAlignment = Enum.TextXAlignment.Center
     selectedText.Parent = dropDownButton
 
+    -- ИСПРАВЛЕНИЕ: Создаем dropdown внутри основного UI
     local dropDownMenu = Instance.new("Frame")
     dropDownMenu.BackgroundColor3 = Color3.fromRGB(25, 25, 27)
     dropDownMenu.BorderSizePixel = 0
     dropDownMenu.Visible = false
     dropDownMenu.ClipsDescendants = true
     dropDownMenu.ZIndex = 50
-    dropDownMenu.Parent = player.PlayerGui:FindFirstChild("MyUI")
+    dropDownMenu.Parent = _G.mainFrame.Parent -- Привязываем к screenGui
 
     local menuCorner = Instance.new("UICorner")
     menuCorner.CornerRadius = UDim.new(0, 6)
@@ -629,7 +630,7 @@ local function createDropDown(parent, setting, position)
         end
     end
 
-    function closeMenu()
+    local function closeMenu()
         if isOpen and not animating then
             animating = true
             isOpen = false
@@ -684,6 +685,51 @@ local function createDropDown(parent, setting, position)
     end
 
     dropDownButton.MouseButton1Click:Connect(openMenu)
+
+    -- ДОБАВЛЕНО: Закрытие при клике вне dropdown
+    local clickConn
+    dropDownButton.MouseButton1Click:Connect(function()
+        if clickConn then clickConn:Disconnect() end
+        
+        clickConn = UIS.InputBegan:Connect(function(input, gameProcessed)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                local mousePos = input.Position
+                local menuAbsPos = dropDownMenu.AbsolutePosition
+                local menuAbsSize = dropDownMenu.AbsoluteSize
+                
+                -- Проверяем клик вне dropdown
+                if not (mousePos.X >= menuAbsPos.X and mousePos.X <= menuAbsPos.X + menuAbsSize.X and
+                       mousePos.Y >= menuAbsPos.Y and mousePos.Y <= menuAbsPos.Y + menuAbsSize.Y) then
+                    closeMenu()
+                    if clickConn then
+                        clickConn:Disconnect()
+                        clickConn = nil
+                    end
+                end
+            end
+        end)
+    end)
+
+    -- ДОБАВЛЕНО: Обновление позиции при перемещении GUI
+    local function updateMenuPosition()
+        if isOpen and not animating then
+            local buttonPos = dropDownButton.AbsolutePosition
+            local buttonSize = dropDownButton.AbsoluteSize
+            local targetWidth = 140
+            local targetHeight = math.min(#setting.options * 32, 200)
+            
+            local targetPos = UDim2.new(
+                0, buttonPos.X + buttonSize.X/2 - targetWidth/2,
+                0, buttonPos.Y + buttonSize.Y/2 - targetHeight/2
+            )
+            
+            dropDownMenu.Position = targetPos
+        end
+    end
+
+    -- Следим за перемещением GUI
+    _G.mainFrame:GetPropertyChangedSignal("Position"):Connect(updateMenuPosition)
+    _G.mainFrame:GetPropertyChangedSignal("Size"):Connect(updateMenuPosition)
 
     return frame
 end
