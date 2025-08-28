@@ -536,9 +536,7 @@ local function createScrollableContainer(parent, size, position, padding)
     return scrollFrame, container
 end
 
-local TweenService = game:GetService("TweenService")
-local player = game.Players.LocalPlayer
-local UserInputService = game:GetService("UserInputService")
+local openDropdowns = {}
 
 local function createDropDown(parent, setting, position)
     local frame = Instance.new("Frame")
@@ -550,7 +548,7 @@ local function createDropDown(parent, setting, position)
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(0.6, 0, 1, 0)
     label.Position = UDim2.new(0, 10, 0, 0)
-    label.Text = setting.name or "Dropdown"
+    label.Text = setting.name
     label.TextColor3 = Color3.fromRGB(142, 142, 142)
     label.Font = Enum.Font.SourceSansBold
     label.TextSize = 22
@@ -567,59 +565,67 @@ local function createDropDown(parent, setting, position)
     dropDownButton.Text = ""
     dropDownButton.Parent = frame
 
-    local buttonCorner = Instance.new("UICorner")
-    buttonCorner.CornerRadius = UDim.new(0, 4)
-    buttonCorner.Parent = dropDownButton
+    local dropDownCorner = Instance.new("UICorner")
+    dropDownCorner.CornerRadius = UDim.new(0, 4)
+    dropDownCorner.Parent = dropDownButton
 
+    -- выбранное значение
+    local selectedValue = setting.default or "Select..."
     local selectedText = Instance.new("TextLabel")
     selectedText.Size = UDim2.new(1, -10, 1, 0)
     selectedText.Position = UDim2.new(0, 8, 0, 0)
     selectedText.BackgroundTransparency = 1
-    selectedText.Text = setting.default or "Select..."
+    selectedText.Text = selectedValue
     selectedText.TextColor3 = Color3.fromRGB(200, 200, 200)
     selectedText.Font = Enum.Font.SourceSans
     selectedText.TextSize = 16
     selectedText.TextXAlignment = Enum.TextXAlignment.Center
+    selectedText.ZIndex = 1010
     selectedText.Parent = dropDownButton
 
-    -- 🔑 теперь меню привязано к той же UI, что и кнопка
+    -- контейнер меню
     local dropDownMenu = Instance.new("Frame")
+    dropDownMenu.Size = UDim2.new(0, 0, 0, 0)
     dropDownMenu.BackgroundColor3 = Color3.fromRGB(25, 25, 27)
     dropDownMenu.BorderSizePixel = 0
     dropDownMenu.Visible = false
+    dropDownMenu.ZIndex = 1000
     dropDownMenu.ClipsDescendants = true
-    dropDownMenu.ZIndex = 50
-    dropDownMenu.Parent = parent  -- вместо PlayerGui
+    dropDownMenu.Parent = parent -- теперь привязан к твоему GUI
 
     local menuCorner = Instance.new("UICorner")
     menuCorner.CornerRadius = UDim.new(0, 6)
     menuCorner.Parent = dropDownMenu
 
     local optionsContainer = Instance.new("Frame")
-    optionsContainer.Size = UDim2.new(1, 0, 1, 0)
+    optionsContainer.Size = UDim2.new(1, -8, 1, -8)
+    optionsContainer.Position = UDim2.new(0, 4, 0, 4)
     optionsContainer.BackgroundTransparency = 1
+    optionsContainer.ZIndex = 1010
     optionsContainer.Parent = dropDownMenu
 
-    local layout = Instance.new("UIListLayout")
-    layout.Parent = optionsContainer
-    layout.Padding = UDim.new(0, 2)
+    local menuLayout = Instance.new("UIListLayout")
+    menuLayout.Padding = UDim.new(0, 2)
+    menuLayout.Parent = optionsContainer
 
-    local isOpen = false
-    local animating = false
+    local isOpen, animating = false, false
 
+    -- обновить список
     local function populateOptions()
         for _, child in ipairs(optionsContainer:GetChildren()) do
             if child:IsA("TextButton") then child:Destroy() end
         end
-
-        for _, option in ipairs(setting.options or {}) do
+        for _, option in ipairs(setting.options) do
             local optionButton = Instance.new("TextButton")
-            optionButton.Size = UDim2.new(1, -8, 0, 28)
+            optionButton.Size = UDim2.new(1, 0, 0, 28)
             optionButton.BackgroundColor3 = Color3.fromRGB(30, 30, 32)
+            optionButton.BorderSizePixel = 0
+            optionButton.AutoButtonColor = false
             optionButton.Text = option
-            optionButton.TextColor3 = Color3.fromRGB(200, 200, 200)
             optionButton.Font = Enum.Font.SourceSans
+            optionButton.TextColor3 = Color3.fromRGB(200, 200, 200)
             optionButton.TextSize = 16
+            optionButton.ZIndex = 1010
             optionButton.Parent = optionsContainer
 
             local corner = Instance.new("UICorner")
@@ -627,89 +633,87 @@ local function createDropDown(parent, setting, position)
             corner.Parent = optionButton
 
             optionButton.MouseButton1Click:Connect(function()
-                selectedText.Text = option -- 🔑 обновляем текст
+                selectedValue = option
+                selectedText.Text = option
                 if setting.callback then setting.callback(option) end
-                closeMenu()
+                frame.Close()
             end)
         end
     end
 
-    function closeMenu()
+    -- закрыть меню
+    function frame.Close()
         if isOpen and not animating then
             animating = true
             isOpen = false
 
-            local buttonPos = dropDownButton.AbsolutePosition
-            local buttonSize = dropDownButton.AbsoluteSize
-            local center = UDim2.new(0, buttonPos.X + buttonSize.X/2, 0, buttonPos.Y + buttonSize.Y/2)
+            local buttonAbsPos = dropDownButton.AbsolutePosition
+            local parentAbsPos = parent.AbsolutePosition
+            local centerX = (buttonAbsPos.X - parentAbsPos.X) + dropDownButton.AbsoluteSize.X/2
+            local centerY = (buttonAbsPos.Y - parentAbsPos.Y) + dropDownButton.AbsoluteSize.Y/2
 
-            local tween = TweenService:Create(dropDownMenu, TweenInfo.new(0.2), {
+            TweenService:Create(dropDownMenu, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
                 Size = UDim2.new(0, 0, 0, 0),
-                Position = center
-            })
-            tween:Play()
-            tween.Completed:Connect(function()
+                Position = UDim2.new(0, centerX, 0, centerY)
+            }):Play()
+
+            task.delay(0.2, function()
                 dropDownMenu.Visible = false
                 animating = false
             end)
         end
     end
 
+    -- открыть меню
     local function openMenu()
-    if not isOpen and not animating then
-        animating = true
-        isOpen = true
+        if not isOpen and not animating then
+            for _, dd in ipairs(openDropdowns) do dd.Close() end
+            openDropdowns = {frame}
 
-        populateOptions()
-        dropDownMenu.Visible = true
+            animating = true
+            isOpen = true
+            populateOptions()
+            dropDownMenu.Visible = true
 
-        local buttonAbsPos = dropDownButton.AbsolutePosition
-        local parentAbsPos = parent.AbsolutePosition
-        local buttonSize = dropDownButton.AbsoluteSize
+            local buttonAbsPos = dropDownButton.AbsolutePosition
+            local parentAbsPos = parent.AbsolutePosition
+            local centerX = (buttonAbsPos.X - parentAbsPos.X) + dropDownButton.AbsoluteSize.X/2
+            local centerY = (buttonAbsPos.Y - parentAbsPos.Y) + dropDownButton.AbsoluteSize.Y/2
 
-        -- 🔑 Центр кнопки, но уже в локальных координатах parent
-        local centerX = (buttonAbsPos.X - parentAbsPos.X) + buttonSize.X/2
-        local centerY = (buttonAbsPos.Y - parentAbsPos.Y) + buttonSize.Y/2
+            local finalWidth = 140
+            local finalHeight = math.min(#setting.options * 32, 200)
 
-        local targetWidth = 140
-        local targetHeight = math.min(#setting.options * 32, 200)
+            dropDownMenu.Size = UDim2.new(0, 0, 0, 0)
+            dropDownMenu.Position = UDim2.new(0, centerX, 0, centerY)
 
-        dropDownMenu.Size = UDim2.new(0, 0, 0, 0)
-        dropDownMenu.Position = UDim2.new(0, centerX, 0, centerY)
+            TweenService:Create(dropDownMenu, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Size = UDim2.new(0, finalWidth, 0, finalHeight),
+                Position = UDim2.new(0, centerX - finalWidth/2, 0, centerY - finalHeight/2)
+            }):Play()
 
-        local targetPos = UDim2.new(0, centerX - targetWidth/2, 0, centerY - targetHeight/2)
-
-        local tween = TweenService:Create(dropDownMenu, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Size = UDim2.new(0, targetWidth, 0, targetHeight),
-            Position = targetPos
-        })
-        tween:Play()
-        tween.Completed:Connect(function()
-            animating = false
-        end)
-    else
-        closeMenu()
-    end
-end
-
-    -- 🔑 обработка клика вне меню (закрытие)
-    UserInputService.InputBegan:Connect(function(input, processed)
-        if isOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local mousePos = input.Position
-            local absPos = dropDownMenu.AbsolutePosition
-            local absSize = dropDownMenu.AbsoluteSize
-            if not (mousePos.X >= absPos.X and mousePos.X <= absPos.X + absSize.X and
-                    mousePos.Y >= absPos.Y and mousePos.Y <= absPos.Y + absSize.Y) then
-                closeMenu()
-            end
+            task.delay(0.25, function()
+                animating = false
+            end)
+        else
+            frame.Close()
         end
-    end)
+    end
 
     dropDownButton.MouseButton1Click:Connect(openMenu)
 
+    -- авто-закрытие при клике вне
+    UserInputService.InputBegan:Connect(function(input)
+        if isOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local mousePos = UserInputService:GetMouseLocation()
+            local absPos, absSize = dropDownMenu.AbsolutePosition, dropDownMenu.AbsoluteSize
+            local inBounds = mousePos.X >= absPos.X and mousePos.X <= absPos.X + absSize.X
+                          and mousePos.Y >= absPos.Y and mousePos.Y <= absPos.Y + absSize.Y
+            if not inBounds then frame.Close() end
+        end
+    end)
+
     return frame
 end
-
 
 local function createTextField(parent, setting, position)
     local frame = Instance.new("Frame")
