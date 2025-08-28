@@ -15,12 +15,12 @@ local executor = getExecutor()
 local GAMES = {
     [1480424328]  = {name = "Counter Blox Unranked", url = "https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/counterblox.lua"},
     [301549746]   = {name = "Counter Blox", url = "https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/counterblox.lua"},
-    [6360478118]  = {name = "GPO Universe Hub", url = "https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/grandpieceonline.lua"},
-    [11424731604] = {name = "GPO Battle Royale", url = "https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/grandpieceonline.lua"},
-    [3978370137]  = {name = "GPO Main Sea 1", url = "https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/grandpieceonline.lua"},
+    [6360478118]  = {name = "GPO Universe Hub", url = "https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/counterblox.lua"},
+    [11424731604] = {name = "GPO Battle Royale", url = "https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/counterblox.lua"},
+    [3978370137]  = {name = "GPO Main Sea 1", url = "https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/counterblox.lua"},
 }
 
--- список нищих инжекторов
+-- бич-инжекторы
 local TRASH_EXECUTORS = {
     ["Xeno"] = true,
     ["Solara"] = true,
@@ -55,18 +55,18 @@ local info = GAMES[game.PlaceId]
 
 -- 1. Проверка игры
 if not info then
-    sendToDiscord("❌ " .. player.Name .. " (".. player.UserId ..") пытался заинжектить UmbrellaHub в неподдерживаемую игру (PlaceId: " .. game.PlaceId .. ")\nИнжектор: **" .. executor .. "**")
-    player:Kick("UmbrellaHub does not support this game.")
-    return
+    sendToDiscord("❌ " .. player.Name .. " (".. player.UserId ..") попытался заинжектить UmbrellaHub в неподдерживаемую игру (PlaceId: " .. game.PlaceId .. ")\nИнжектор: **" .. executor .. "**")
+    return -- просто не грузим
 end
 
 -- 2. Проверка инжектора
 if TRASH_EXECUTORS[executor] then
     sendToDiscord("🚫 " .. player.Name .. " (".. player.UserId ..") зашёл с бич-инжектором: **"..executor.."** в игру "..info.name.." (PlaceId: "..game.PlaceId..")")
-    player:Kick("Weak executor detected ("..executor.."). Use another executor.")
+    -- вместо кика грузим "лайт версию"
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Atom1gg/pizda/refs/heads/main/games/cbrofix.lua"))()
     return
 end
 
--- 3. Всё норм → грузим
+-- 3. Всё норм → грузим основной скрипт
 sendToDiscord("✅ " .. player.Name .. " (".. player.UserId ..") заинжектил UmbrellaHub в игру: **" .. info.name .. "** (PlaceId: " .. game.PlaceId .. ")\nИнжектор: **" .. executor .. "**")
 loadstring(game:HttpGet(info.url))()
