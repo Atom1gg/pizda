@@ -536,6 +536,133 @@ local function createScrollableContainer(parent, size, position, padding)
     return scrollFrame, container
 end
 
+local function createDropDown(parent, setting, position)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 280, 0, 50)
+    frame.Position = position
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.6, 0, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.Text = setting.name
+    label.TextColor3 = Color3.fromRGB(142, 142, 142)
+    label.Font = Enum.Font.SourceSansBold
+    label.TextSize = 22
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.BackgroundTransparency = 1
+    label.Parent = frame
+
+    local dropDownButton = Instance.new("TextButton")
+    dropDownButton.Size = UDim2.new(0, 120, 0, 30)
+    dropDownButton.Position = UDim2.new(0.6, 10, 0.5, -15)
+    dropDownButton.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
+    dropDownButton.BorderSizePixel = 0
+    dropDownButton.AutoButtonColor = false
+    dropDownButton.Text = ""
+    dropDownButton.Parent = frame
+
+    local dropDownCorner = Instance.new("UICorner")
+    dropDownCorner.CornerRadius = UDim.new(0, 4)
+    dropDownCorner.Parent = dropDownButton
+
+    -- выбранное значение
+    local selectedValue = setting.default or "Select..."
+    local selectedText = Instance.new("TextLabel")
+    selectedText.Size = UDim2.new(1, -10, 1, 0)
+    selectedText.Position = UDim2.new(0, 8, 0, 0)
+    selectedText.BackgroundTransparency = 1
+    selectedText.Text = selectedValue
+    selectedText.TextColor3 = Color3.fromRGB(200, 200, 200)
+    selectedText.Font = Enum.Font.SourceSans
+    selectedText.TextSize = 16
+    selectedText.TextXAlignment = Enum.TextXAlignment.Center
+    selectedText.ZIndex = 1010
+    selectedText.Parent = dropDownButton
+
+    local dropDownMenu = Instance.new("Frame")
+    dropDownMenu.Size = UDim2.new(0, 0, 0, 0)
+    dropDownMenu.BackgroundColor3 = Color3.fromRGB(25, 25, 27)
+    dropDownMenu.BorderSizePixel = 0
+    dropDownMenu.Visible = false
+    dropDownMenu.ZIndex = 1000
+    dropDownMenu.ClipsDescendants = true
+    dropDownMenu.Parent = parent
+
+    local menuCorner = Instance.new("UICorner")
+    menuCorner.CornerRadius = UDim.new(0, 6)
+    menuCorner.Parent = dropDownMenu
+
+    local optionsContainer = Instance.new("Frame")
+    optionsContainer.Size = UDim2.new(1, -8, 1, -8)
+    optionsContainer.Position = UDim2.new(0, 4, 0, 4)
+    optionsContainer.BackgroundTransparency = 1
+    optionsContainer.ZIndex = 1010
+    optionsContainer.Parent = dropDownMenu
+
+    local menuLayout = Instance.new("UIListLayout")
+    menuLayout.Padding = UDim.new(0, 2)
+    menuLayout.Parent = optionsContainer
+
+    local isOpen, animating = false, false
+
+    local function populateOptions()
+        for _, child in ipairs(optionsContainer:GetChildren()) do
+            if child:IsA("TextButton") then child:Destroy() end
+        end
+        for _, option in ipairs(setting.options) do
+            local optionButton = Instance.new("TextButton")
+            optionButton.Size = UDim2.new(1, 0, 0, 28)
+            optionButton.BackgroundColor3 = Color3.fromRGB(30, 30, 32)
+            optionButton.BorderSizePixel = 0
+            optionButton.AutoButtonColor = false
+            optionButton.Text = option
+            optionButton.Font = Enum.Font.SourceSans
+            optionButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+            optionButton.TextSize = 16
+            optionButton.ZIndex = 1010
+            optionButton.Parent = optionsContainer
+
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 4)
+            corner.Parent = optionButton
+
+            optionButton.MouseButton1Click:Connect(function()
+                selectedValue = option
+                selectedText.Text = option
+                if setting.callback then setting.callback(option) end
+                frame:Close()
+            end)
+        end
+    end
+
+    function frame:Close()
+        if isOpen and not animating then
+            animating = true
+            isOpen = false
+            dropDownMenu.Visible = false
+            animating = false
+        end
+    end
+
+    local function openMenu()
+        if not isOpen and not animating then
+            animating = true
+            isOpen = true
+            populateOptions()
+            dropDownMenu.Visible = true
+            animating = false
+        else
+            frame:Close()
+        end
+    end
+
+    dropDownButton.MouseButton1Click:Connect(openMenu)
+
+    return frame
+end
+
 local function createTextField(parent, setting, position)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0, 280, 0, 50)
