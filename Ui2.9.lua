@@ -584,7 +584,7 @@ local function createDropDown(parent, setting, position)
     dropDownMenu.Visible = false
     dropDownMenu.ClipsDescendants = true
     dropDownMenu.ZIndex = 50
-    dropDownMenu.Parent = player.PlayerGui:FindFirstChild("MyUI")
+    dropDownMenu.Parent = screenGui or player.PlayerGui
 
     local menuCorner = Instance.new("UICorner")
     menuCorner.CornerRadius = UDim.new(0, 6)
