@@ -609,72 +609,7 @@ local function createDropDown(parent, setting, position)
 
     local isOpen = false
     local animating = false
-
-    local function populateOptions()
-        for _, child in ipairs(optionsContainer:GetChildren()) do
-            if child:IsA("TextButton") then child:Destroy() end
-        end
-
-        for _, option in ipairs(setting.options or {}) do
-            local optionButton = Instance.new("TextButton")
-            optionButton.Size = UDim2.new(1, 0, 0, 28)
-            optionButton.BackgroundColor3 = Color3.fromRGB(20, 20, 22) -- Цвет как у кнопки
-            optionButton.Text = option
-            optionButton.TextColor3 = Color3.fromRGB(200, 200, 200)
-            optionButton.Font = Enum.Font.SourceSans
-            optionButton.TextSize = 16
-            optionButton.AutoButtonColor = false
-            optionButton.ZIndex = optionsContainer.ZIndex + 1
-            optionButton.Parent = optionsContainer
-
-            local corner = Instance.new("UICorner")
-            corner.CornerRadius = UDim.new(0, 4)
-            corner.Parent = optionButton
-
-            -- ХОВЕР ЭФФЕКТ КАК В МОДУЛЬ СИСТЕМЕ
-            optionButton.MouseEnter:Connect(function()
-                if selectedText.Text ~= option then
-                    TweenService:Create(optionButton, TweenInfo.new(0.2), {
-                        BackgroundColor3 = Color3.fromRGB(30, 30, 32)
-                    }):Play()
-                end
-            end)
-
-            optionButton.MouseLeave:Connect(function()
-                if selectedText.Text ~= option then
-                    TweenService:Create(optionButton, TweenInfo.new(0.2), {
-                        BackgroundColor3 = Color3.fromRGB(20, 20, 22)
-                    }):Play()
-                end
-            end)
-
-            optionButton.MouseButton1Click:Connect(function()
-                -- АКТИВНЫЙ КАК В МОДУЛЬ СИСТЕМЕ (КРАСНЫЙ ТЕКСТ)
-                selectedText.Text = option
-                selectedText.TextColor3 = Color3.fromRGB(255, 75, 75)
-                
-                -- Применяем настройку
-                if setting.callback then 
-                    setting.callback(option) 
-                end
-                
-                -- Сохраняем настройку
-                if not API.savedSettings[setting.moduleName] then
-                    API.savedSettings[setting.moduleName] = {}
-                end
-                API.savedSettings[setting.moduleName][setting.name] = option
-                saveSettings()
-                
-                closeMenu() -- ТВОЯ АНИМАЦИЯ ЗАКРЫТИЯ
-            end)
-
-            -- Подсвечиваем активную опцию
-            if selectedText.Text == option then
-                optionButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30) -- Активный фон
-                optionButton.TextColor3 = Color3.fromRGB(255, 75, 75) -- Красный текст
-            end
-        end
-    end
+    local clickConn = nil
 
     local function closeMenu()
         if isOpen and not animating then
@@ -693,6 +628,10 @@ local function createDropDown(parent, setting, position)
             tween.Completed:Connect(function()
                 dropDownMenu.Visible = false
                 animating = false
+                if clickConn then
+                    clickConn:Disconnect()
+                    clickConn = nil
+                end
             end)
         end
     end
@@ -702,7 +641,72 @@ local function createDropDown(parent, setting, position)
             animating = true
             isOpen = true
 
-            populateOptions()
+            -- Очищаем предыдущие опции
+            for _, child in ipairs(optionsContainer:GetChildren()) do
+                if child:IsA("TextButton") then child:Destroy() end
+            end
+
+            -- Создаем новые опции
+            for _, option in ipairs(setting.options or {}) do
+                local optionButton = Instance.new("TextButton")
+                optionButton.Size = UDim2.new(1, 0, 0, 28)
+                optionButton.BackgroundColor3 = Color3.fromRGB(20, 20, 22) -- Цвет как у кнопки
+                optionButton.Text = option
+                optionButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+                optionButton.Font = Enum.Font.SourceSans
+                optionButton.TextSize = 16
+                optionButton.AutoButtonColor = false
+                optionButton.ZIndex = optionsContainer.ZIndex + 1
+                optionButton.Parent = optionsContainer
+
+                local corner = Instance.new("UICorner")
+                corner.CornerRadius = UDim.new(0, 4)
+                corner.Parent = optionButton
+
+                -- ХОВЕР ЭФФЕКТ КАК В МОДУЛЬ СИСТЕМЕ
+                optionButton.MouseEnter:Connect(function()
+                    if selectedText.Text ~= option then
+                        TweenService:Create(optionButton, TweenInfo.new(0.2), {
+                            BackgroundColor3 = Color3.fromRGB(30, 30, 32)
+                        }):Play()
+                    end
+                end)
+
+                optionButton.MouseLeave:Connect(function()
+                    if selectedText.Text ~= option then
+                        TweenService:Create(optionButton, TweenInfo.new(0.2), {
+                            BackgroundColor3 = Color3.fromRGB(20, 20, 22)
+                        }):Play()
+                    end
+                end)
+
+                optionButton.MouseButton1Click:Connect(function()
+                    -- АКТИВНЫЙ КАК В МОДУЛЬ СИСТЕМЕ (КРАСНЫЙ ТЕКСТ)
+                    selectedText.Text = option
+                    selectedText.TextColor3 = Color3.fromRGB(255, 75, 75)
+                    
+                    -- Применяем настройку
+                    if setting.callback then 
+                        setting.callback(option) 
+                    end
+                    
+                    -- Сохраняем настройку
+                    if not API.savedSettings[setting.moduleName] then
+                        API.savedSettings[setting.moduleName] = {}
+                    end
+                    API.savedSettings[setting.moduleName][setting.name] = option
+                    saveSettings()
+                    
+                    closeMenu() -- ЗАКРЫВАЕМ МЕНЮ ПОСЛЕ ВЫБОРА
+                end)
+
+                -- Подсвечиваем активную опцию
+                if selectedText.Text == option then
+                    optionButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30) -- Активный фон
+                    optionButton.TextColor3 = Color3.fromRGB(255, 75, 75) -- Красный текст
+                end
+            end
+
             dropDownMenu.Visible = true
 
             local buttonPos = dropDownButton.AbsolutePosition
@@ -725,35 +729,38 @@ local function createDropDown(parent, setting, position)
             tween.Completed:Connect(function()
                 animating = false
             end)
+
+            -- ЗАКРЫТИЕ ПРИ КЛИКЕ ВНЕ
+            if clickConn then
+                clickConn:Disconnect()
+            end
+            
+            clickConn = UIS.InputBegan:Connect(function(input, gameProcessed)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    local mousePos = input.Position
+                    local menuAbsPos = dropDownMenu.AbsolutePosition
+                    local menuAbsSize = dropDownMenu.AbsoluteSize
+                    local buttonAbsPos = dropDownButton.AbsolutePosition
+                    local buttonAbsSize = dropDownButton.AbsoluteSize
+                    
+                    -- Проверяем, был ли клик вне дропдауна и кнопки
+                    local isClickOutsideMenu = not (mousePos.X >= menuAbsPos.X and mousePos.X <= menuAbsPos.X + menuAbsSize.X and
+                                                   mousePos.Y >= menuAbsPos.Y and mousePos.Y <= menuAbsPos.Y + menuAbsSize.Y)
+                    
+                    local isClickOutsideButton = not (mousePos.X >= buttonAbsPos.X and mousePos.X <= buttonAbsPos.X + buttonAbsSize.X and
+                                                     mousePos.Y >= buttonAbsPos.Y and mousePos.Y <= buttonAbsPos.Y + buttonAbsSize.Y)
+                    
+                    if isClickOutsideMenu and isClickOutsideButton then
+                        closeMenu()
+                    end
+                end
+            end)
         else
             closeMenu()
         end
     end
 
     dropDownButton.MouseButton1Click:Connect(openMenu)
-
-    -- ЗАКРЫТИЕ ПРИ КЛИКЕ ВНЕ
-    local clickConn
-    dropDownButton.MouseButton1Click:Connect(function()
-        if clickConn then clickConn:Disconnect() end
-        
-        clickConn = UIS.InputBegan:Connect(function(input, gameProcessed)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                local mousePos = input.Position
-                local menuAbsPos = dropDownMenu.AbsolutePosition
-                local menuAbsSize = dropDownMenu.AbsoluteSize
-                
-                if not (mousePos.X >= menuAbsPos.X and mousePos.X <= menuAbsPos.X + menuAbsSize.X and
-                       mousePos.Y >= menuAbsPos.Y and mousePos.Y <= menuAbsPos.Y + menuAbsSize.Y) then
-                    closeMenu()
-                    if clickConn then
-                        clickConn:Disconnect()
-                        clickConn = nil
-                    end
-                end
-            end
-        end)
-    end)
 
     -- ОБНОВЛЕНИЕ ПОЗИЦИИ
     local function updateMenuPosition()
