@@ -641,28 +641,43 @@ local function createDropDown(parent, setting, position)
         end
     end
 
-    -- закрыть меню
     function frame:Close()
-        if isOpen and not animating then
-            animating = true
-            isOpen = false
+    if isOpen and not animating then
+        animating = true
+        isOpen = false
 
-            local buttonAbsPos = dropDownButton.AbsolutePosition
-            local parentAbsPos = parent.AbsolutePosition
-            local centerX = (buttonAbsPos.X - parentAbsPos.X) + dropDownButton.AbsoluteSize.X/2
-            local centerY = (buttonAbsPos.Y - parentAbsPos.Y) + dropDownButton.AbsoluteSize.Y/2
+        local buttonAbsPos = dropDownButton.AbsolutePosition
+        local buttonAbsSize = dropDownButton.AbsoluteSize
+        local centerPos = UDim2.new(0, buttonAbsPos.X + buttonAbsSize.X/2, 0, buttonAbsPos.Y + buttonAbsSize.Y/2)
 
-            TweenService:Create(dropDownMenu, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        local closeTween = TweenService:Create(dropDownMenu, 
+            TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), 
+            {
                 Size = UDim2.new(0, 0, 0, 0),
-                Position = UDim2.new(0, centerX, 0, centerY)
-            }):Play()
+                Position = centerPos
+            }
+        )
 
-            task.delay(0.2, function()
-                dropDownMenu.Visible = false
-                animating = false
-            end)
-        end
+        local fadeTween = TweenService:Create(dropDownMenu, 
+            TweenInfo.new(0.2), 
+            {BackgroundTransparency = 1}
+        )
+
+        local shadowFadeTween = TweenService:Create(shadow, 
+            TweenInfo.new(0.2), 
+            {BackgroundTransparency = 1}
+        )
+
+        closeTween:Play()
+        fadeTween:Play()
+        shadowFadeTween:Play()
+
+        closeTween.Completed:Connect(function()
+            dropDownMenu.Visible = false
+            animating = false
+        end)
     end
+end
 
     -- открыть меню
     local function openMenu()
