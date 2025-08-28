@@ -790,55 +790,41 @@ local function createDropDown(parent, setting, position)
     end
 
     local function openDropdown()
-        if not isOpen and not animating then
-            animating = true
-            isOpen = true
-            
-            closeAllDropdowns(frame)
-            updateOptionsMenu()
-            
-            local finalPosition, finalSize = calculateDropdownPosition()
-            
-            -- Устанавливаем начальную позицию в центре кнопки
-            local buttonAbsPos = dropDownButton.AbsolutePosition
-            local buttonAbsSize = dropDownButton.AbsoluteSize
-            local centerPos = UDim2.new(0, buttonAbsPos.X + buttonAbsSize.X/2, 0, buttonAbsPos.Y + buttonAbsSize.Y/2)
-            
-            dropDownMenu.Position = centerPos
-            dropDownMenu.Size = UDim2.new(0, 0, 0, 0)
-            dropDownMenu.BackgroundTransparency = 1
-            shadow.BackgroundTransparency = 1
-            dropDownMenu.Visible = true
-            
-            -- Анимация открытия - выплывание из кнопки
-            local openTween = TweenService:Create(dropDownMenu, 
-                TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), 
-                {
-                    Size = finalSize,
-                    Position = finalPosition
-                }
-            )
-            
-            local fadeTween = TweenService:Create(dropDownMenu, 
-                TweenInfo.new(0.25), 
-                {BackgroundTransparency = 0}
-            )
-            
-            local shadowFadeTween = TweenService:Create(shadow, 
-                TweenInfo.new(0.25), 
-                {BackgroundTransparency = 0.7}
-            )
-            
-            openTween:Play()
-            fadeTween:Play()
-            shadowFadeTween:Play()
-            
-            openTween.Completed:Connect(function()
-                animating = false
-            end)
-        elseif isOpen then
-            frame:Close()
-        end
+if not isOpen and not animating then
+    animating = true
+    isOpen = true
+
+    closeAllDropdowns(frame)
+    table.insert(openDropdowns, frame)
+    updateOptionsMenu()
+
+    dropDownMenu.ZIndex = 1000
+    shadow.ZIndex = 999
+
+    local finalPos, finalSize = calculateDropdownPosition()
+
+    dropDownMenu.Position = finalPos
+    dropDownMenu.Size = UDim2.new(0, 0, 0, 0)
+    dropDownMenu.BackgroundTransparency = 1
+    shadow.BackgroundTransparency = 1
+    dropDownMenu.Visible = true
+
+    task.wait()
+
+    local openTween = TweenService:Create(dropDownMenu, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = finalSize, Position = finalPos
+    })
+    local fadeTween = TweenService:Create(dropDownMenu, TweenInfo.new(0.25), { BackgroundTransparency = 0 })
+    local shadowTween = TweenService:Create(shadow, TweenInfo.new(0.25), { BackgroundTransparency = 0.7 })
+
+    openTween:Play()
+    fadeTween:Play()
+    shadowTween:Play()
+
+    openTween.Completed:Connect(function() animating = false end)
+elseif isOpen then
+    frame:Close()
+end
     end
 
     -- Hover эффекты для кнопки
