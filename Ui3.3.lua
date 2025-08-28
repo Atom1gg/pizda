@@ -603,7 +603,6 @@ local function createDropDown(parent, setting, position)
 
     local layout = Instance.new("UIListLayout")
     layout.Padding = UDim.new(0, 2)
-    layout.ZIndex = optionsContainer.ZIndex  -- Такой же как контейнер
     layout.Parent = optionsContainer
 
     local isOpen = false
