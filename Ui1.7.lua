@@ -536,6 +536,10 @@ local function createScrollableContainer(parent, size, position, padding)
     return scrollFrame, container
 end
 
+local TweenService = game:GetService("TweenService")
+local player = game.Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+
 local function createDropDown(parent, setting, position)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0, 280, 0, 50)
@@ -578,13 +582,14 @@ local function createDropDown(parent, setting, position)
     selectedText.TextXAlignment = Enum.TextXAlignment.Center
     selectedText.Parent = dropDownButton
 
+    -- 🔑 теперь меню привязано к той же UI, что и кнопка
     local dropDownMenu = Instance.new("Frame")
     dropDownMenu.BackgroundColor3 = Color3.fromRGB(25, 25, 27)
     dropDownMenu.BorderSizePixel = 0
     dropDownMenu.Visible = false
     dropDownMenu.ClipsDescendants = true
     dropDownMenu.ZIndex = 50
-    dropDownMenu.Parent = player.PlayerGui:FindFirstChild("MyUI")
+    dropDownMenu.Parent = parent  -- вместо PlayerGui
 
     local menuCorner = Instance.new("UICorner")
     menuCorner.CornerRadius = UDim.new(0, 6)
@@ -622,7 +627,7 @@ local function createDropDown(parent, setting, position)
             corner.Parent = optionButton
 
             optionButton.MouseButton1Click:Connect(function()
-                selectedText.Text = option
+                selectedText.Text = option -- 🔑 обновляем текст
                 if setting.callback then setting.callback(option) end
                 closeMenu()
             end)
@@ -683,10 +688,24 @@ local function createDropDown(parent, setting, position)
         end
     end
 
+    -- 🔑 обработка клика вне меню (закрытие)
+    UserInputService.InputBegan:Connect(function(input, processed)
+        if isOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local mousePos = input.Position
+            local absPos = dropDownMenu.AbsolutePosition
+            local absSize = dropDownMenu.AbsoluteSize
+            if not (mousePos.X >= absPos.X and mousePos.X <= absPos.X + absSize.X and
+                    mousePos.Y >= absPos.Y and mousePos.Y <= absPos.Y + absSize.Y) then
+                closeMenu()
+            end
+        end
+    end)
+
     dropDownButton.MouseButton1Click:Connect(openMenu)
 
     return frame
 end
+
 
 local function createTextField(parent, setting, position)
     local frame = Instance.new("Frame")
