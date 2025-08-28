@@ -723,57 +723,6 @@ end
 
 return createDropDown
 
-    -- открыть меню
-    local function openMenu()
-        if not isOpen and not animating then
-            for _, dd in ipairs(openDropdowns) do dd.Close() end
-            openDropdowns = {frame}
-
-            animating = true
-            isOpen = true
-            populateOptions()
-            dropDownMenu.Visible = true
-
-            local buttonAbsPos = dropDownButton.AbsolutePosition
-            local parentAbsPos = parent.AbsolutePosition
-            local centerX = (buttonAbsPos.X - parentAbsPos.X) + dropDownButton.AbsoluteSize.X/2
-            local centerY = (buttonAbsPos.Y - parentAbsPos.Y) + dropDownButton.AbsoluteSize.Y/2
-
-            local finalWidth = 140
-            local finalHeight = math.min(#setting.options * 32, 200)
-
-            dropDownMenu.Size = UDim2.new(0, 0, 0, 0)
-            dropDownMenu.Position = UDim2.new(0, centerX, 0, centerY)
-
-            TweenService:Create(dropDownMenu, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.new(0, finalWidth, 0, finalHeight),
-                Position = UDim2.new(0, centerX - finalWidth/2, 0, centerY - finalHeight/2)
-            }):Play()
-
-            task.delay(0.25, function()
-                animating = false
-            end)
-        else
-            frame.Close()
-        end
-    end
-
-    dropDownButton.MouseButton1Click:Connect(openMenu)
-
-    -- авто-закрытие при клике вне
-    UserInputService.InputBegan:Connect(function(input)
-        if isOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local mousePos = UserInputService:GetMouseLocation()
-            local absPos, absSize = dropDownMenu.AbsolutePosition, dropDownMenu.AbsoluteSize
-            local inBounds = mousePos.X >= absPos.X and mousePos.X <= absPos.X + absSize.X
-                          and mousePos.Y >= absPos.Y and mousePos.Y <= absPos.Y + absSize.Y
-            if not inBounds then frame.Close() end
-        end
-    end)
-
-    return frame
-end
-
 local function createTextField(parent, setting, position)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0, 280, 0, 50)
