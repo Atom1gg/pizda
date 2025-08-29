@@ -23,7 +23,6 @@ local GAMES = {
 -- бич-инжекторы
 local TRASH_EXECUTORS = {
     ["Xeno"] = true,
-    ["Solara"] = true,
     ["JJSploit x Xeno"] = true,
     ["JJSploit"] = true,
 }
