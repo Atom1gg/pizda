@@ -1453,6 +1453,16 @@ function createMainUI()
     screenGui.ResetOnSpawn = false
     screenGui.Parent = player:WaitForChild("PlayerGui")
 
+    local clickBlocker = Instance.new("TextButton")
+    clickBlocker.Size = UDim2.new(1, 0, 1, 0)
+    clickBlocker.BackgroundTransparency = 1
+    clickBlocker.Text = ""
+    clickBlocker.ZIndex = 0
+    clickBlocker.Parent = mainFrame
+
+    clickBlocker.MouseButton1Click:Connect(function() end)
+    clickBlocker.MouseButton2Click:Connect(function() end)
+
     local mainFrame = Instance.new("Frame")
     mainFrame.Size = UDim2.new(0, 900, 0, 600)
     mainFrame.Position = UDim2.new(0.5, -450, 0.5, -300)
