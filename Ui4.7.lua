@@ -1,4 +1,8 @@
 local player = game:GetService("Players").LocalPlayer
+if not player then
+    player = game:GetService("Players"):GetPropertyChangedSignal("LocalPlayer"):Wait()
+    player = game:GetService("Players").LocalPlayer
+end
 local existingUI = player.PlayerGui:FindFirstChild("MyUI")
 if existingUI then
     existingUI:Destroy()
