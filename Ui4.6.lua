@@ -1279,6 +1279,11 @@ local function createModuleButton(parent, moduleData)
 
     -- Клик → выбор модуля для настройки
     clickDetector.MouseButton1Click:Connect(function()
+        -- Сохраняем выбранный модуль для текущей категории
+        if moduleSystem.activeCategory then
+            moduleSystem.selectedModulesByCategory[moduleSystem.activeCategory] = moduleData.name
+        end
+
         -- Сбрасываем подсветку у всех других модулей
         for _, otherButton in pairs(parent:GetChildren()) do
             if otherButton:IsA("Frame") and otherButton ~= moduleButton then
@@ -1326,6 +1331,30 @@ local function updateModuleList(moduleFrame, categoryName)
             local moduleButton = createModuleButton(moduleFrame, moduleData)
             moduleButton:SetAttribute("ModuleIndex", index)
             moduleButton.Parent = moduleFrame
+
+            -- Восстанавливаем выбранный модуль для этой категории
+            local selectedModuleName = moduleSystem.selectedModulesByCategory[categoryName]
+            if selectedModuleName and selectedModuleName == moduleData.name then
+                -- Подсвечиваем сохраненный выбранный модуль
+                local activeLine = moduleButton:FindFirstChild("Frame")
+                local moduleName = moduleButton:FindFirstChild("TextLabel")
+                
+                moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
+                if activeLine then 
+                    activeLine.Transparency = 0
+                    activeLine.Size = UDim2.new(0, 2, 1, -20)
+                end
+                if moduleName then 
+                    moduleName.TextColor3 = Color3.fromRGB(255, 75, 75)
+                end
+
+                -- Показываем настройки выбранного модуля
+                slashLabel.Visible = true
+                moduleNameLabel.Text = moduleData.name
+                moduleNameLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
+                moduleSystem.activeModuleName = moduleData.name
+                showModuleSettings(moduleData.name)
+            end
         end
     end
 end
