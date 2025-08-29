@@ -1064,51 +1064,53 @@ local function createToggle(parent, setting, position)
     circleCorner.CornerRadius = UDim.new(1, 0)
     circleCorner.Parent = switchCircle
 
-    -- ИСПРАВЛЕНО: Загружаем сохраненное значение
+    -- Загружаем сохраненное значение
     local isEnabled = setting.default
     if API.savedSettings[setting.moduleName] and API.savedSettings[setting.moduleName][setting.name] ~= nil then
         isEnabled = API.savedSettings[setting.moduleName][setting.name]
     end
 
-    -- Устанавливаем визуальное состояние
-    if isEnabled then
-        switchCircle.Position = UDim2.new(1, -19, 0, 1)
-        switchCircle.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
+    -- Универсальный сеттер
+    local function setToggleState(newState)
+        isEnabled = newState
+        if isEnabled then
+            switchCircle:TweenPosition(UDim2.new(1, -19, 0, 1), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
+            switchCircle.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
+        else
+            switchCircle:TweenPosition(UDim2.new(0, 1, 0, 1), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
+            switchCircle.BackgroundColor3 = Color3.fromRGB(142, 142, 142)
+        end
+
+        -- Сохраняем
+        if not API.savedSettings[setting.moduleName] then
+            API.savedSettings[setting.moduleName] = {}
+        end
+        API.savedSettings[setting.moduleName][setting.name] = isEnabled
+
+        if setting.name == "Enabled" then
+            API.savedModuleStates[setting.moduleName] = isEnabled
+        end
+
+        saveSettings()
+
+        -- Вызываем callback
+        if setting.callback then
+            pcall(setting.callback, isEnabled)
+        end
     end
 
+    -- применяем сохраненный стейт
+    setToggleState(isEnabled)
+
+    -- обработчик клика
     switchTrack.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            isEnabled = not isEnabled
-            
-            -- Анимация переключения
-            if isEnabled then
-                switchCircle:TweenPosition(UDim2.new(1, -19, 0, 1), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
-                switchCircle.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
-            else
-                switchCircle:TweenPosition(UDim2.new(0, 1, 0, 1), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
-                switchCircle.BackgroundColor3 = Color3.fromRGB(142, 142, 142)
-            end
-            
-            -- ИСПРАВЛЕНО: Сохраняем в правильную структуру
-            if not API.savedSettings[setting.moduleName] then
-                API.savedSettings[setting.moduleName] = {}
-            end
-            API.savedSettings[setting.moduleName][setting.name] = isEnabled
-            
-            -- ДОБАВЛЕНО: Специальная обработка для переключателя "Enabled"
-            if setting.name == "Enabled" then
-                API.savedModuleStates[setting.moduleName] = isEnabled
-            end
-            
-            -- ИСПРАВЛЕНО: Сохраняем изменения в файл
-            saveSettings()
-            
-            -- Вызываем callback
-            if setting.callback then
-                setting.callback(isEnabled)
-            end
+            setToggleState(not isEnabled)
         end
     end)
+
+    -- экспортируем в setting, чтобы можно было выключить кодом
+    setting._setToggleState = setToggleState
 
     return outerFrame
 end
@@ -1119,37 +1121,28 @@ end
 
 function API:loadSettings()
     loadSettings()
-    
-    -- Применяем сохраненные состояния модулей при загрузке
+
+    -- Применяем состояния модулей
     for moduleName, enabled in pairs(self.savedModuleStates) do
         for category, modules in pairs(self.modules) do
             for _, module in ipairs(modules) do
                 if module.name == moduleName then
                     module.enabled = enabled
-                    
-                    -- ДОБАВЛЕНО: Применяем настройки ПЕРЕД включением модуля
-                    if enabled then
-                        applyModuleSettings(moduleName)
-                        
-                        -- Затем включаем модуль
-                        if module.callback then
-                            pcall(module.callback, true)
-                        end
+                    if module.callback then
+                        pcall(module.callback, enabled)
                     end
                     break
                 end
             end
         end
     end
-    
-    -- Применяем сохраненные настройки ТОЛЬКО при загрузке, БЕЗ вызова callback'ов
-    -- (они уже вызваны выше для включенных модулей)
+
+    -- Применяем значения настроек
     for moduleName, settings in pairs(self.settings) do
         if self.savedSettings[moduleName] then
             for _, setting in ipairs(settings.settings) do
                 if self.savedSettings[moduleName][setting.name] ~= nil then
                     setting.default = self.savedSettings[moduleName][setting.name]
-                    -- НЕ ВЫЗЫВАЕМ callback здесь для выключенных модулей
                 end
             end
         end
@@ -1159,8 +1152,7 @@ end
 local function saveModuleState(moduleName, enabled)
     API.savedModuleStates[moduleName] = enabled
     saveSettings()
-    
-    -- Немедленно применяем изменение состояния
+
     for category, modules in pairs(API.modules) do
         for _, module in ipairs(modules) do
             if module.name == moduleName then
