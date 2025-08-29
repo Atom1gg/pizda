@@ -1258,14 +1258,6 @@ local function createModuleButton(parent, moduleData)
     clickDetector.ZIndex = 10
     clickDetector.Parent = moduleButton
 
-    -- Подсветка если модуль уже включен
-    if moduleData.enabled then
-        moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
-        moduleName.TextColor3 = Color3.fromRGB(255, 75, 75)
-        activeLine.Size = UDim2.new(0, 2, 1, -20)
-        activeLine.Transparency = 0
-    end
-
     -- Hover эффекты
     clickDetector.MouseEnter:Connect(function()
         tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(20, 20, 22), 0.15)
@@ -1273,24 +1265,30 @@ local function createModuleButton(parent, moduleData)
     end)
 
     clickDetector.MouseLeave:Connect(function()
-        if not moduleData.enabled then
-            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17), 0.15)
-            tweenColor(moduleName, "TextColor3", Color3.fromRGB(150, 153, 163), 0.15)
-        else
+        -- Проверяем, является ли этот модуль активно выбранным для настройки
+        if moduleSystem.activeModuleName == moduleData.name then
+            -- Если выбран - оставляем подсветку
             tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30), 0.15)
             tweenColor(moduleName, "TextColor3", Color3.fromRGB(255, 75, 75), 0.15)
+        else
+            -- Если не выбран - убираем подсветку
+            tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(15, 15, 17), 0.15)
+            tweenColor(moduleName, "TextColor3", Color3.fromRGB(150, 153, 163), 0.15)
         end
     end)
 
-    -- Клик → выбор модуля (но НЕ переключение enabled!)
+    -- Клик → выбор модуля для настройки
     clickDetector.MouseButton1Click:Connect(function()
-        -- сбрасываем подсветку у других
+        -- Сбрасываем подсветку у всех других модулей
         for _, otherButton in pairs(parent:GetChildren()) do
             if otherButton:IsA("Frame") and otherButton ~= moduleButton then
                 local otherLine = otherButton:FindFirstChild("Frame")
                 local otherText = otherButton:FindFirstChild("TextLabel")
-                tweenTransparency(otherLine, "Transparency", 1)
-                tweenSize(otherLine, "Size", UDim2.new(0, 2, 0, 0))
+                
+                if otherLine then
+                    tweenTransparency(otherLine, "Transparency", 1)
+                    tweenSize(otherLine, "Size", UDim2.new(0, 2, 0, 0))
+                end
                 if otherText then
                     tweenColor(otherText, "TextColor3", Color3.fromRGB(150, 153, 163))
                 end
@@ -1298,15 +1296,16 @@ local function createModuleButton(parent, moduleData)
             end
         end
 
-        -- подсветка активного
+        -- Подсвечиваем выбранный модуль
         tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
         tweenColor(moduleName, "TextColor3", Color3.fromRGB(255, 75, 75))
         activeLine.Transparency = 0
         tweenSize(activeLine, "Size", UDim2.new(0, 2, 1, -20))
 
-        -- показать настройки
+        -- Показываем настройки выбранного модуля
         slashLabel.Visible = true
         moduleNameLabel.Text = moduleData.name
+        moduleNameLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
         moduleSystem.activeModuleName = moduleData.name
         showModuleSettings(moduleData.name)
     end)
@@ -1327,28 +1326,6 @@ local function updateModuleList(moduleFrame, categoryName)
             local moduleButton = createModuleButton(moduleFrame, moduleData)
             moduleButton:SetAttribute("ModuleIndex", index)
             moduleButton.Parent = moduleFrame
-
-            if moduleData.enabled then
-                local activeLine = moduleButton:FindFirstChild("Frame")
-                local moduleName = moduleButton:FindFirstChild("TextLabel")
-
-                moduleButton.BackgroundColor3 = Color3.fromRGB(22, 28, 30)
-                if activeLine then 
-                    activeLine.Transparency = 0
-                    activeLine.Size = UDim2.new(0, 2, 1, -20)
-                end
-                if moduleName then moduleName.TextColor3 = Color3.fromRGB(255, 75, 75) end
-
-                slashLabel.Visible = true
-                moduleNameLabel.Text = moduleData.name
-                moduleNameLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
-                moduleSystem.activeModuleName = moduleData.name
-                showModuleSettings(moduleData.name)
-                
-                if API.callbacks[moduleData.name] and API.callbacks[moduleData.name].onEnable then
-                    pcall(API.callbacks[moduleData.name].onEnable)
-                end
-            end
         end
     end
 end
