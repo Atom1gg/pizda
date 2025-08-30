@@ -31,7 +31,7 @@ local TRASH_EXECUTORS = {
 }
 
 -- твой вебхук
-local WEBHOOK_URL = "https://discordapp.com/api/webhooks/1410324453975658668/61-dJPlKwlAQzfjFcKtdMH2aCyCtvVN1MsE-X_dR55TBFE2L_5APBUcgf9B1P7U6AKK5"
+local WEBHOOK_URL = "https://discordapp.com/api/webhooks/1410995597611372566/RVkWXbtDAfRnsWNbrdJfhyC1dXNswxhoei3pyNRZZ7t94y2FF3DhYsj7SxdoiBxyOerG"
 
 ----------------------------------------------------------
 -- АНТИ-СЛИВ И АНТИ-ДЕБАГ
