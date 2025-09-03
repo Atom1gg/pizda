@@ -376,11 +376,9 @@ function API:registerSettings(moduleName, settingsTable)
             end
         end
     }
-    	
-
-	table.insert(allSettings, enabledToggle) -- Enabled добавляется в конец
-    -- ИСПРАВЛЕНО: Пользовательские настройки идут первыми
-    local allSettings = {}
+    
+    -- Объединяем настройки
+    local allSettings = {enabledToggle}
     for _, setting in ipairs(settingsTable) do
         table.insert(allSettings, setting)
     end
@@ -417,7 +415,6 @@ function API:registerSettings(moduleName, settingsTable)
         end
     end
 end
-
 -- ДОБАВЛЕНО: Функция для применения отложенных callback'ов
 function API:applyPendingCallbacks()
     self.isInitialized = true
