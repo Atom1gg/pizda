@@ -377,31 +377,28 @@ function API:registerSettings(moduleName, settingsTable)
         end
     }
     
-    -- Объединяем настройки
-    local allSettings = {enabledToggle}
+    -- ИСПРАВЛЕНО: Пользовательские настройки идут первыми
+    local allSettings = {}
     for _, setting in ipairs(settingsTable) do
         table.insert(allSettings, setting)
     end
+    table.insert(allSettings, enabledToggle) -- Enabled добавляется в конец
     
     self.settings[moduleName] = {settings = allSettings}
     
-    -- Загружаем сохраненные значения
+    -- ИСПРАВЛЕНО: Загружаем сохраненные значения БЕЗ вызова callback'ов
     if self.savedSettings[moduleName] then
         for _, setting in ipairs(allSettings) do
             local savedValue = self.savedSettings[moduleName][setting.name]
             if savedValue ~= nil then
                 setting.default = savedValue
+                -- НЕ ВЫЗЫВАЕМ callback здесь сразу!
                 
-                -- ИСПРАВЛЕНО: Отложенное применение callback'ов
+                -- ИСПРАВЛЕНО: Добавляем callback'и в очередь для применения после инициализации
                 if setting.callback then
-                    if self.isInitialized then
+                    table.insert(self.pendingCallbacks, function()
                         pcall(setting.callback, savedValue)
-                    else
-                        -- Добавляем в очередь для применения после инициализации
-                        table.insert(self.pendingCallbacks, function()
-                            pcall(setting.callback, savedValue)
-                        end)
-                    end
+                    end)
                 end
             end
         end
@@ -547,6 +544,9 @@ local function createDropDown(parent, setting, position)
     selectedText.BackgroundTransparency = 1
     selectedText.Text = setting.default or "Select..."
     selectedText.TextColor3 = Color3.fromRGB(200, 200, 200)
+    if selectedText.Text ~= "Select..." then
+    selectedText.TextColor3 = Color3.fromRGB(255, 75, 75)
+end
     selectedText.Font = Enum.Font.SourceSans
     selectedText.TextSize = 16
     selectedText.TextXAlignment = Enum.TextXAlignment.Center
