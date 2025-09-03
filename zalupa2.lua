@@ -387,22 +387,14 @@ function API:registerSettings(moduleName, settingsTable)
     self.settings[moduleName] = {settings = allSettings}
     
     -- Загружаем сохраненные значения
-if self.savedSettings[moduleName] then
-    for _, setting in ipairs(allSettings) do
-        local savedValue = self.savedSettings[moduleName][setting.name]
-        if savedValue ~= nil then
-            setting.default = savedValue
-            
-            -- ДОБАВЬ ЭТО: Обновляем визуал дропдауна если он уже создан
-            if setting.type == "dropdown" and setting._dropdownRef then
-                local selectedText = setting._dropdownRef:FindFirstChild("TextLabel")
-                if selectedText then
-                    selectedText.Text = savedValue
-                    selectedText.TextColor3 = Color3.fromRGB(255, 75, 75)
-                end
-            end
-            
-            if setting.callback then
+    if self.savedSettings[moduleName] then
+        for _, setting in ipairs(allSettings) do
+            local savedValue = self.savedSettings[moduleName][setting.name]
+            if savedValue ~= nil then
+                setting.default = savedValue
+                
+                -- ИСПРАВЛЕНО: Отложенное применение callback'ов
+                if setting.callback then
                     if self.isInitialized then
                         pcall(setting.callback, savedValue)
                     else
