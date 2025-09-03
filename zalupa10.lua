@@ -378,11 +378,10 @@ function API:registerSettings(moduleName, settingsTable)
     }
     
     -- ИСПРАВЛЕНО: Пользовательские настройки идут первыми
-    local allSettings = {}
-    for _, setting in ipairs(settingsTable) do
-        table.insert(allSettings, setting)
-    end
-    table.insert(allSettings, enabledToggle) -- Enabled добавляется в конец
+local allSettings = {enabledToggle} -- Enabled добавляется в начало
+for _, setting in ipairs(settingsTable) do
+    table.insert(allSettings, setting)
+end
     
     self.settings[moduleName] = {settings = allSettings}
     
