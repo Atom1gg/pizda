@@ -1716,7 +1716,6 @@ function createMainUI()
     end)
     
     API:loadSettings()
-    task.wait(0.1) -- небольшая задержка для завершения всех процессов
     API:applyPendingCallbacks()
 end
 
