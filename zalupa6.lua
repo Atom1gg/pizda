@@ -376,13 +376,14 @@ function API:registerSettings(moduleName, settingsTable)
             end
         end
     }
-    
+    	
+
+	table.insert(allSettings, enabledToggle) -- Enabled добавляется в конец
     -- ИСПРАВЛЕНО: Пользовательские настройки идут первыми
     local allSettings = {}
     for _, setting in ipairs(settingsTable) do
         table.insert(allSettings, setting)
     end
-    table.insert(allSettings, enabledToggle) -- Enabled добавляется в конец
     
     self.settings[moduleName] = {settings = allSettings}
     
@@ -1716,6 +1717,7 @@ function createMainUI()
     end)
     
     API:loadSettings()
+    task.wait(0.1) -- небольшая задержка для завершения всех процессов
     API:applyPendingCallbacks()
 end
 
