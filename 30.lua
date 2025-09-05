@@ -1210,7 +1210,7 @@ local function createToggle(parent, setting, position)
     
     if shouldHaveBind then
         keybindButton = Instance.new("TextButton")
-        keybindButton.Size = UDim2.new(0, 80, 0, 30)
+        keybindButton.Size = UDim2.new(0, 60, 0, 30)
         keybindButton.Position = UDim2.new(0.6, 290, 0.5, -15) -- Слева от переключателя
         keybindButton.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
         keybindButton.BorderSizePixel = 0
@@ -1243,7 +1243,6 @@ local function createToggle(parent, setting, position)
         -- Обработчик клика на кнопку бинда
         keybindButton.MouseButton1Click:Connect(function()
             keybindText.Text = "[...]"
-            keybindText.TextColor3 = Color3.fromRGB(255, 255, 0) -- Желтый цвет при ожидании
             keybindSystem.listeningForBind = setting.moduleName
             keybindSystem.listeningCallback = function(keyName)
                 keybindText.TextColor3 = Color3.fromRGB(200, 200, 200)
