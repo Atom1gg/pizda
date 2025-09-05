@@ -497,6 +497,7 @@ function API:registerSettings(moduleName, settingsTable)
     local enabledToggle = {
         name = "Enabled",
         type = "toggle",
+        bind = true,
         default = moduleData and moduleData.enabled or false,
         callback = function(value)
             if moduleData then
