@@ -1228,7 +1228,7 @@ local function createToggle(parent, setting, position)
         keybindText.BackgroundTransparency = 1
         keybindText.Font = Enum.Font.SourceSans
         keybindText.TextSize = 19
-        keybindText.TextColor3 = Color3.fromRGB(142, 142, 142)
+        keybindText.TextColor3 = Color3.fromRGB(200, 200, 200)
         keybindText.ZIndex = keybindButton.ZIndex + 1
         keybindText.Parent = keybindButton
 
