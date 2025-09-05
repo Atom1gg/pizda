@@ -1211,7 +1211,7 @@ local function createToggle(parent, setting, position)
     if shouldHaveBind then
         keybindButton = Instance.new("TextButton")
         keybindButton.Size = UDim2.new(0, 60, 0, 30)
-        keybindButton.Position = UDim2.new(0.6, 290, 0.5, -15) -- Слева от переключателя
+        keybindButton.Position = UDim2.new(0.6, 300, 0.5, -15) -- Слева от переключателя
         keybindButton.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
         keybindButton.BorderSizePixel = 0
         keybindButton.AutoButtonColor = false
@@ -1263,19 +1263,6 @@ local function createToggle(parent, setting, position)
                 keybindSystem.listeningForBind = nil
                 keybindSystem.listeningCallback = nil
             end
-        end)
-
-        -- Ховер эффекты для кнопки бинда
-        keybindButton.MouseEnter:Connect(function()
-            TweenService:Create(keybindButton, TweenInfo.new(0.2), {
-                BackgroundColor3 = Color3.fromRGB(30, 30, 32)
-            }):Play()
-        end)
-
-        keybindButton.MouseLeave:Connect(function()
-            TweenService:Create(keybindButton, TweenInfo.new(0.2), {
-                BackgroundColor3 = Color3.fromRGB(20, 20, 22)
-            }):Play()
         end)
     end
 
