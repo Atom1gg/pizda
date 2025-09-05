@@ -1210,10 +1210,8 @@ local function createToggle(parent, setting, position)
     
     if shouldHaveBind then
         keybindButton = Instance.new("TextButton")
-        -- УВЕЛИЧИВАЕМ РАЗМЕР: ширина 80 вместо 60, высота 25 вместо 20
-        keybindButton.Size = UDim2.new(0, 80, 0, 25)
-        -- Сдвигаем позицию из-за увеличенного размера
-        keybindButton.Position = UDim2.new(0.6, 290, 0.5, -12)
+        keybindButton.Size = UDim2.new(0, 60, 0, 20)
+        keybindButton.Position = UDim2.new(0.6, 300, 0.5, -10) -- Слева от переключателя
         keybindButton.BackgroundColor3 = Color3.fromRGB(30, 30, 32)
         keybindButton.BorderSizePixel = 0
         keybindButton.AutoButtonColor = false
@@ -1229,10 +1227,8 @@ local function createToggle(parent, setting, position)
         keybindText.Position = UDim2.new(0, 2, 0, 2)
         keybindText.BackgroundTransparency = 1
         keybindText.Font = Enum.Font.SourceSans
-        -- УВЕЛИЧИВАЕМ РАЗМЕР ТЕКСТА
-        keybindText.TextSize = 14
-        -- УБИРАЕМ ЦВЕТА: всегда серый текст
-        keybindText.TextColor3 = Color3.fromRGB(150, 150, 150)
+        keybindText.TextSize = 12
+        keybindText.TextColor3 = Color3.fromRGB(200, 200, 200)
         keybindText.ZIndex = keybindButton.ZIndex + 1
         keybindText.Parent = keybindButton
 
@@ -1247,13 +1243,12 @@ local function createToggle(parent, setting, position)
         -- Обработчик клика на кнопку бинда
         keybindButton.MouseButton1Click:Connect(function()
             keybindText.Text = "[...]"
-            -- УБИРАЕМ ЦВЕТ ПРИ ОЖИДАНИИ: оставляем серый
-            keybindText.TextColor3 = Color3.fromRGB(150, 150, 150)
+            keybindText.TextColor3 = Color3.fromRGB(255, 255, 0) -- Желтый цвет при ожидании
             keybindSystem.listeningForBind = setting.moduleName
             keybindSystem.listeningCallback = function(keyName)
                 if keyName == "None" then
                     keybindText.Text = "[None]"
-                    keybindText.TextColor3 = Color3.fromRGB(150, 150, 150)
+                    keybindText.TextColor3 = Color3.fromRGB(200, 200, 200)
                     -- Убираем бинд
                     for keyCode, moduleName in pairs(keybindSystem.binds) do
                         if moduleName == setting.moduleName then
@@ -1265,11 +1260,25 @@ local function createToggle(parent, setting, position)
                     saveKeybinds()
                 else
                     keybindText.Text = "[" .. keyName .. "]"
-                    -- УБИРАЕМ ЦВЕТ ПРИ АКТИВНОМ БИНДЕ: оставляем серый
-                    keybindText.TextColor3 = Color3.fromRGB(150, 150, 150)
+                    keybindText.TextColor3 = Color3.fromRGB(255, 75, 75) -- Красный цвет при активном бинде
                 end
             end
         end)
+
+        -- Hover эффекты для кнопки бинда
+        keybindButton.MouseEnter:Connect(function()
+            TweenService:Create(keybindButton, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(40, 40, 42)
+            }):Play()
+        end)
+
+        keybindButton.MouseLeave:Connect(function()
+            TweenService:Create(keybindButton, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(30, 30, 32)
+            }):Play()
+        end)
+    end
+
     -- Переключатель перемещен вправо
     local switchTrack = Instance.new("Frame")
     switchTrack.Size = UDim2.new(0, 40, 0, 20)
