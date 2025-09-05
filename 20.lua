@@ -1210,7 +1210,7 @@ local function createToggle(parent, setting, position)
     
     if shouldHaveBind then
         keybindButton = Instance.new("TextButton")
-        keybindButton.Size = UDim2.new(0, 60, 0, 20)
+        keybindButton.Size = UDim2.new(0, 120, 0, 50)
         keybindButton.Position = UDim2.new(0.6, 300, 0.5, -10) -- Слева от переключателя
         keybindButton.BackgroundColor3 = Color3.fromRGB(30, 30, 32)
         keybindButton.BorderSizePixel = 0
@@ -1227,7 +1227,7 @@ local function createToggle(parent, setting, position)
         keybindText.Position = UDim2.new(0, 2, 0, 2)
         keybindText.BackgroundTransparency = 1
         keybindText.Font = Enum.Font.SourceSans
-        keybindText.TextSize = 12
+        keybindText.TextSize = 18
         keybindText.TextColor3 = Color3.fromRGB(200, 200, 200)
         keybindText.ZIndex = keybindButton.ZIndex + 1
         keybindText.Parent = keybindButton
