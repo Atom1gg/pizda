@@ -1183,10 +1183,9 @@ local function createSlider(parent, setting, position)
     return frame
 end
 
--- МОДИФИКАЦИЯ: Обновленная функция createToggle с кнопкой бинда
 local function createToggle(parent, setting, position)
     local outerFrame = Instance.new("Frame")
-    outerFrame.Size = UDim2.new(0, 280, 0, 50)
+    outerFrame.Size = UDim2.new(0, 580, 0, 50) -- Увеличили ширину для кнопки бинда
     outerFrame.Position = position
     outerFrame.BackgroundTransparency = 1
     outerFrame.BorderSizePixel = 0
@@ -1194,7 +1193,7 @@ local function createToggle(parent, setting, position)
     outerFrame.Parent = parent
 
     local enableLabel = Instance.new("TextLabel")
-    enableLabel.Size = UDim2.new(0.6, 0, 1, 0)
+    enableLabel.Size = UDim2.new(0.4, 0, 1, 0) -- Уменьшили ширину
     enableLabel.Position = UDim2.new(0, 10, 0, 0)
     enableLabel.Text = setting.name
     enableLabel.TextColor3 = Color3.fromRGB(142, 142, 142)
@@ -1207,7 +1206,7 @@ local function createToggle(parent, setting, position)
 
     local switchTrack = Instance.new("Frame")
     switchTrack.Size = UDim2.new(0, 40, 0, 20)
-    switchTrack.Position = UDim2.new(0.6, 390, 0.5, -10)
+    switchTrack.Position = UDim2.new(0, 280, 0.5, -10) -- Сдвинули левее
     switchTrack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     switchTrack.BorderSizePixel = 0
     switchTrack.ZIndex = outerFrame.ZIndex + 1
@@ -1229,14 +1228,14 @@ local function createToggle(parent, setting, position)
     circleCorner.CornerRadius = UDim.new(1, 0)
     circleCorner.Parent = switchCircle
 
-    -- ДОБАВЛЕНО: Кнопка бинда только для тогглов с bind = true или для "Enabled"
+    -- ИСПРАВЛЕНО: Упрощенная логика определения нужности бинда
+    local shouldHaveBind = setting.bind == true or setting.name == "Enabled"
     local keybindButton = nil
-    local shouldHaveBind = setting.bind == true or (setting.name == "Enabled" and setting.bind ~= false)
     
     if shouldHaveBind then
         keybindButton = Instance.new("TextButton")
-        keybindButton.Size = UDim2.new(0, 60, 0, 20)
-        keybindButton.Position = UDim2.new(0.6, 440, 0.5, -10)
+        keybindButton.Size = UDim2.new(0, 80, 0, 20)
+        keybindButton.Position = UDim2.new(0, 340, 0.5, -10) -- Позиция справа от тоггла
         keybindButton.BackgroundColor3 = Color3.fromRGB(30, 30, 32)
         keybindButton.BorderSizePixel = 0
         keybindButton.AutoButtonColor = false
@@ -1257,32 +1256,41 @@ local function createToggle(parent, setting, position)
         keybindText.ZIndex = keybindButton.ZIndex + 1
         keybindText.Parent = keybindButton
 
+        -- ИСПРАВЛЕНО: Используем setting.moduleName который присваивается в showModuleSettings
+        local moduleName = setting.moduleName
+        print("Debug: moduleName =", moduleName) -- Для отладки
+        
         -- Устанавливаем изначальный текст
-        local savedBind = keybindSystem.savedBinds[setting.moduleName]
+        local savedBind = keybindSystem.savedBinds[moduleName]
         if savedBind then
             keybindText.Text = "[" .. getKeyName(Enum.KeyCode[savedBind]) .. "]"
+            print("Debug: Found saved bind:", savedBind) -- Для отладки
         else
             keybindText.Text = "[None]"
+            print("Debug: No saved bind found") -- Для отладки
         end
 
         -- Обработчик клика на кнопку бинда
         keybindButton.MouseButton1Click:Connect(function()
+            print("Debug: Keybind button clicked for module:", moduleName) -- Для отладки
             keybindText.Text = "[...]"
-            keybindSystem.listeningForBind = setting.moduleName
+            keybindSystem.listeningForBind = moduleName
             keybindSystem.listeningCallback = function(keyName)
                 if keyName == "None" then
                     keybindText.Text = "[None]"
                     -- Убираем бинд
-                    for keyCode, moduleName in pairs(keybindSystem.binds) do
-                        if moduleName == setting.moduleName then
+                    for keyCode, moduleNameInBind in pairs(keybindSystem.binds) do
+                        if moduleNameInBind == moduleName then
                             keybindSystem.binds[keyCode] = nil
                             break
                         end
                     end
-                    keybindSystem.savedBinds[setting.moduleName] = nil
+                    keybindSystem.savedBinds[moduleName] = nil
                     saveKeybinds()
+                    print("Debug: Bind removed for module:", moduleName) -- Для отладки
                 else
                     keybindText.Text = "[" .. keyName .. "]"
+                    print("Debug: Bind set to", keyName, "for module:", moduleName) -- Для отладки
                 end
             end
         end)
@@ -1301,6 +1309,7 @@ local function createToggle(parent, setting, position)
         end)
     end
 
+    -- Остальная логика тоггла остается без изменений
     local isEnabled = setting.default
     if API.savedSettings[setting.moduleName] and API.savedSettings[setting.moduleName][setting.name] ~= nil then
         isEnabled = API.savedSettings[setting.moduleName][setting.name]
