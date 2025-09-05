@@ -1182,7 +1182,6 @@ local function createSlider(parent, setting, position)
     return frame
 end
 
--- МОДИФИКАЦИЯ: Обновленная функция createToggle с кнопкой бинда
 local function createToggle(parent, setting, position)
     local outerFrame = Instance.new("Frame")
     outerFrame.Size = UDim2.new(0, 280, 0, 50)
@@ -1206,6 +1205,7 @@ local function createToggle(parent, setting, position)
 
     -- Кнопка бинда (только если bind = true или для "Enabled")
     local keybindButton = nil
+    local keybindText = nil
     local shouldHaveBind = setting.bind == true or (setting.name == "Enabled" and setting.bind ~= false)
     
     if shouldHaveBind then
@@ -1222,7 +1222,7 @@ local function createToggle(parent, setting, position)
         keybindCorner.CornerRadius = UDim.new(0, 4)
         keybindCorner.Parent = keybindButton
 
-        local keybindText = Instance.new("TextLabel")
+        keybindText = Instance.new("TextLabel")
         keybindText.Size = UDim2.new(1, -4, 1, -4)
         keybindText.Position = UDim2.new(0, 2, 0, 2)
         keybindText.BackgroundTransparency = 1
@@ -1246,6 +1246,7 @@ local function createToggle(parent, setting, position)
             keybindText.TextColor3 = Color3.fromRGB(255, 255, 0) -- Желтый цвет при ожидании
             keybindSystem.listeningForBind = setting.moduleName
             keybindSystem.listeningCallback = function(keyName)
+                keybindText.TextColor3 = Color3.fromRGB(200, 200, 200)
                 if keyName == "None" then
                     keybindText.Text = "[None]"
                     -- Убираем бинд
@@ -1260,12 +1261,29 @@ local function createToggle(parent, setting, position)
                 else
                     keybindText.Text = "[" .. keyName .. "]"
                 end
+                keybindSystem.listeningForBind = nil
+                keybindSystem.listeningCallback = nil
             end
         end)
+
+        -- Ховер эффекты для кнопки бинда
+        keybindButton.MouseEnter:Connect(function()
+            TweenService:Create(keybindButton, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(30, 30, 32)
+            }):Play()
+        end)
+
+        keybindButton.MouseLeave:Connect(function()
+            TweenService:Create(keybindButton, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(20, 20, 22)
+            }):Play()
+        end)
+    end
+
     -- Переключатель перемещен вправо
     local switchTrack = Instance.new("Frame")
     switchTrack.Size = UDim2.new(0, 40, 0, 20)
-    switchTrack.Position = UDim2.new(0.6, 390, 0.5, -10) -- Если есть бинд, сдвигаем правее
+    switchTrack.Position = UDim2.new(0.6, 390, 0.5, -10)
     switchTrack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     switchTrack.BorderSizePixel = 0
     switchTrack.ZIndex = outerFrame.ZIndex + 1
