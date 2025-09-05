@@ -190,26 +190,31 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
             for category, modules in pairs(API.modules) do
                 for _, module in ipairs(modules) do
                     if module.name == moduleName then
-                        module.enabled = not module.enabled
-                        API.savedModuleStates[moduleName] = module.enabled
+                        local newState = not module.enabled
+                        module.enabled = newState
+                        API.savedModuleStates[moduleName] = newState
                         saveSettings()
                         
+                        -- Вызываем callback модуля
                         if module.callback then
-                            pcall(module.callback, module.enabled)
+                            pcall(module.callback, newState)
                         end
                         
-                        -- Обновляем UI если модуль открыт
+                        -- Обновляем UI если модуль открыт в настройках
                         if moduleSystem.activeModuleName == moduleName and API.settings[moduleName] then
-                            local enabledSetting = API.settings[moduleName].settings[1]
-                            if enabledSetting and enabledSetting._setToggleState then
-                                enabledSetting._setToggleState(module.enabled)
+                            local settings = API.settings[moduleName].settings
+                            for _, setting in ipairs(settings) do
+                                if setting.name == "Enabled" and setting._setToggleState then
+                                    setting._setToggleState(newState)
+                                    break
+                                end
                             end
                         end
                         
                         -- Показываем нотификацию
                         showNotification(
-                            moduleName .. " " .. (module.enabled and "enabled" or "disabled"),
-                            module.enabled and "success" or "error",
+                            moduleName .. " " .. (newState and "enabled" or "disabled"),
+                            newState and "success" or "error",
                             2
                         )
                         return
@@ -1309,7 +1314,7 @@ local function createToggle(parent, setting, position)
         end)
     end
 
-    -- Остальная логика тоггла остается без изменений
+    -- Остальная логика тоггла остается без изменений  
     local isEnabled = setting.default
     if API.savedSettings[setting.moduleName] and API.savedSettings[setting.moduleName][setting.name] ~= nil then
         isEnabled = API.savedSettings[setting.moduleName][setting.name]
@@ -1337,7 +1342,10 @@ local function createToggle(parent, setting, position)
         saveSettings()
 
         if setting.callback then
+            print("Debug: Calling callback for", setting.name, "with value:", isEnabled) -- Для отладки
             pcall(setting.callback, isEnabled)
+        else
+            print("Debug: No callback found for", setting.name) -- Для отладки
         end
     end
 
@@ -1345,6 +1353,180 @@ local function createToggle(parent, setting, position)
 
     switchTrack.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            print("Debug: Toggle clicked for", setting.name, "current state:", isEnabled) -- Для отладки
+            setToggleState(not isEnabled)
+        end
+    end)
+
+    setting._setToggleState = setToggleState
+
+    return outerFrame
+endlocal function createToggle(parent, setting, position)
+    local outerFrame = Instance.new("Frame")
+    outerFrame.Size = UDim2.new(0, 580, 0, 50) -- Увеличили ширину для кнопки бинда
+    outerFrame.Position = position
+    outerFrame.BackgroundTransparency = 1
+    outerFrame.BorderSizePixel = 0
+    outerFrame.ZIndex = parent.ZIndex + 1
+    outerFrame.Parent = parent
+
+    local enableLabel = Instance.new("TextLabel")
+    enableLabel.Size = UDim2.new(0.4, 0, 1, 0) -- Уменьшили ширину
+    enableLabel.Position = UDim2.new(0, 10, 0, 0)
+    enableLabel.Text = setting.name
+    enableLabel.TextColor3 = Color3.fromRGB(142, 142, 142)
+    enableLabel.Font = Enum.Font.SourceSansBold
+    enableLabel.TextSize = 22
+    enableLabel.TextXAlignment = Enum.TextXAlignment.Left
+    enableLabel.BackgroundTransparency = 1
+    enableLabel.ZIndex = outerFrame.ZIndex + 1
+    enableLabel.Parent = outerFrame
+
+    local switchTrack = Instance.new("Frame")
+    switchTrack.Size = UDim2.new(0, 40, 0, 20)
+    switchTrack.Position = UDim2.new(0, 280, 0.5, -10) -- Сдвинули левее
+    switchTrack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    switchTrack.BorderSizePixel = 0
+    switchTrack.ZIndex = outerFrame.ZIndex + 1
+    switchTrack.Parent = outerFrame
+
+    local trackCorner = Instance.new("UICorner")
+    trackCorner.CornerRadius = UDim.new(1, 0)
+    trackCorner.Parent = switchTrack
+
+    local switchCircle = Instance.new("Frame")
+    switchCircle.Size = UDim2.new(0, 18, 0, 18)
+    switchCircle.Position = UDim2.new(0, 1, 0, 1)
+    switchCircle.BackgroundColor3 = Color3.fromRGB(142, 142, 142)
+    switchCircle.BorderSizePixel = 0
+    switchCircle.ZIndex = switchTrack.ZIndex + 1
+    switchCircle.Parent = switchTrack
+
+    local circleCorner = Instance.new("UICorner")
+    circleCorner.CornerRadius = UDim.new(1, 0)
+    circleCorner.Parent = switchCircle
+
+    -- ИСПРАВЛЕНО: Упрощенная логика определения нужности бинда
+    local shouldHaveBind = setting.bind == true or setting.name == "Enabled"
+    local keybindButton = nil
+    
+    if shouldHaveBind then
+        keybindButton = Instance.new("TextButton")
+        keybindButton.Size = UDim2.new(0, 80, 0, 20)
+        keybindButton.Position = UDim2.new(0, 340, 0.5, -10) -- Позиция справа от тоггла
+        keybindButton.BackgroundColor3 = Color3.fromRGB(30, 30, 32)
+        keybindButton.BorderSizePixel = 0
+        keybindButton.AutoButtonColor = false
+        keybindButton.ZIndex = outerFrame.ZIndex + 1
+        keybindButton.Parent = outerFrame
+
+        local keybindCorner = Instance.new("UICorner")
+        keybindCorner.CornerRadius = UDim.new(0, 4)
+        keybindCorner.Parent = keybindButton
+
+        local keybindText = Instance.new("TextLabel")
+        keybindText.Size = UDim2.new(1, -4, 1, -4)
+        keybindText.Position = UDim2.new(0, 2, 0, 2)
+        keybindText.BackgroundTransparency = 1
+        keybindText.Font = Enum.Font.SourceSans
+        keybindText.TextSize = 12
+        keybindText.TextColor3 = Color3.fromRGB(200, 200, 200)
+        keybindText.ZIndex = keybindButton.ZIndex + 1
+        keybindText.Parent = keybindButton
+
+        -- ИСПРАВЛЕНО: Используем setting.moduleName который присваивается в showModuleSettings
+        local moduleName = setting.moduleName
+        print("Debug: moduleName =", moduleName) -- Для отладки
+        
+        -- Устанавливаем изначальный текст
+        local savedBind = keybindSystem.savedBinds[moduleName]
+        if savedBind then
+            keybindText.Text = "[" .. getKeyName(Enum.KeyCode[savedBind]) .. "]"
+            print("Debug: Found saved bind:", savedBind) -- Для отладки
+        else
+            keybindText.Text = "[None]"
+            print("Debug: No saved bind found") -- Для отладки
+        end
+
+        -- Обработчик клика на кнопку бинда
+        keybindButton.MouseButton1Click:Connect(function()
+            print("Debug: Keybind button clicked for module:", moduleName) -- Для отладки
+            keybindText.Text = "[...]"
+            keybindSystem.listeningForBind = moduleName
+            keybindSystem.listeningCallback = function(keyName)
+                if keyName == "None" then
+                    keybindText.Text = "[None]"
+                    -- Убираем бинд
+                    for keyCode, moduleNameInBind in pairs(keybindSystem.binds) do
+                        if moduleNameInBind == moduleName then
+                            keybindSystem.binds[keyCode] = nil
+                            break
+                        end
+                    end
+                    keybindSystem.savedBinds[moduleName] = nil
+                    saveKeybinds()
+                    print("Debug: Bind removed for module:", moduleName) -- Для отладки
+                else
+                    keybindText.Text = "[" .. keyName .. "]"
+                    print("Debug: Bind set to", keyName, "for module:", moduleName) -- Для отладки
+                end
+            end
+        end)
+
+        -- Hover эффекты для кнопки бинда
+        keybindButton.MouseEnter:Connect(function()
+            TweenService:Create(keybindButton, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(40, 40, 42)
+            }):Play()
+        end)
+
+        keybindButton.MouseLeave:Connect(function()
+            TweenService:Create(keybindButton, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(30, 30, 32)
+            }):Play()
+        end)
+    end
+
+    -- Остальная логика тоггла остается без изменений  
+    local isEnabled = setting.default
+    if API.savedSettings[setting.moduleName] and API.savedSettings[setting.moduleName][setting.name] ~= nil then
+        isEnabled = API.savedSettings[setting.moduleName][setting.name]
+    end
+
+    local function setToggleState(newState)
+        isEnabled = newState
+        if isEnabled then
+            switchCircle:TweenPosition(UDim2.new(1, -19, 0, 1), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
+            switchCircle.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
+        else
+            switchCircle:TweenPosition(UDim2.new(0, 1, 0, 1), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
+            switchCircle.BackgroundColor3 = Color3.fromRGB(142, 142, 142)
+        end
+
+        if not API.savedSettings[setting.moduleName] then
+            API.savedSettings[setting.moduleName] = {}
+        end
+        API.savedSettings[setting.moduleName][setting.name] = isEnabled
+
+        if setting.name == "Enabled" then
+            API.savedModuleStates[setting.moduleName] = isEnabled
+        end
+
+        saveSettings()
+
+        if setting.callback then
+            print("Debug: Calling callback for", setting.name, "with value:", isEnabled) -- Для отладки
+            pcall(setting.callback, isEnabled)
+        else
+            print("Debug: No callback found for", setting.name) -- Для отладки
+        end
+    end
+
+    setToggleState(isEnabled)
+
+    switchTrack.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            print("Debug: Toggle clicked for", setting.name, "current state:", isEnabled) -- Для отладки
             setToggleState(not isEnabled)
         end
     end)
