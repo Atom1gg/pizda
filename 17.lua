@@ -1282,7 +1282,7 @@ local function createToggle(parent, setting, position)
     -- Переключатель перемещен вправо
     local switchTrack = Instance.new("Frame")
     switchTrack.Size = UDim2.new(0, 40, 0, 20)
-    switchTrack.Position = UDim2.new(0.6, shouldHaveBind and 370 or 390, 0.5, -10) -- Если есть бинд, сдвигаем правее
+    switchTrack.Position = UDim2.new(0.6, 390, 0.5, -10) -- Если есть бинд, сдвигаем правее
     switchTrack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     switchTrack.BorderSizePixel = 0
     switchTrack.ZIndex = outerFrame.ZIndex + 1
