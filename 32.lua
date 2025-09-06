@@ -59,7 +59,8 @@ local function saveSettings()
     local success, err = pcall(function()
         local dataToSave = {
             settings = API.savedSettings,
-            moduleStates = API.savedModuleStates
+            moduleStates = API.savedModuleStates,
+            keybinds = keybindSystem.savedBinds  -- ДОБАВЛЕНО: сохраняем бинды
         }
         
         if not isfolder("Umbrella") then
@@ -112,32 +113,6 @@ local function getKeyName(keyCode)
     }
     
     return keyNames[keyCode] or keyCode.Name
-end
-
--- Функция сохранения биндов
-local function saveKeybinds()
-    if not API.savedSettings.Keybinds then
-        API.savedSettings.Keybinds = {}
-    end
-    API.savedSettings.Keybinds = keybindSystem.savedBinds
-    saveSettings()
-end
-
--- Функция загрузки биндов
-local function loadKeybinds()
-    if API.savedSettings.Keybinds then
-        keybindSystem.savedBinds = API.savedSettings.Keybinds
-        
-        -- Восстанавливаем активные бинды
-        for moduleName, keyCodeName in pairs(keybindSystem.savedBinds) do
-            for _, keyCode in pairs(Enum.KeyCode:GetEnumItems()) do
-                if keyCode.Name == keyCodeName then
-                    keybindSystem.binds[keyCode] = moduleName
-                    break
-                end
-            end
-        end
-    end
 end
 
 UIS.InputBegan:Connect(function(input, gameProcessed)
@@ -197,11 +172,15 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
                             pcall(module.callback, module.enabled)
                         end
                         
-                        -- Обновляем UI если модуль открыт
+                        -- ИСПРАВЛЕНО: Обновляем UI если модуль открыт
                         if moduleSystem.activeModuleName == moduleName and API.settings[moduleName] then
-                            local enabledSetting = API.settings[moduleName].settings[1]
-                            if enabledSetting and enabledSetting._setToggleState then
-                                enabledSetting._setToggleState(module.enabled)
+                            local settings = API.settings[moduleName].settings
+                            -- Ищем настройку "Enabled"
+                            for _, setting in ipairs(settings) do
+                                if setting.name == "Enabled" and setting._setToggleState then
+                                    setting._setToggleState(module.enabled)
+                                    break
+                                end
                             end
                         end
                         
@@ -230,10 +209,24 @@ local function loadSettings()
     if success and result then
         API.savedSettings = result.settings or {}
         API.savedModuleStates = result.moduleStates or {}
+        -- ДОБАВЛЕНО: загружаем бинды
+        if result.keybinds then
+            keybindSystem.savedBinds = result.keybinds
+            -- Восстанавливаем активные бинды
+            for moduleName, keyCodeName in pairs(keybindSystem.savedBinds) do
+                for _, keyCode in pairs(Enum.KeyCode:GetEnumItems()) do
+                    if keyCode.Name == keyCodeName then
+                        keybindSystem.binds[keyCode] = moduleName
+                        break
+                    end
+                end
+            end
+        end
     else
         warn("Failed to load settings:", result)
         API.savedSettings = {}
         API.savedModuleStates = {}
+        keybindSystem.savedBinds = {}
     end
 end
 
@@ -1211,7 +1204,7 @@ local function createToggle(parent, setting, position)
     if shouldHaveBind then
         keybindButton = Instance.new("TextButton")
         keybindButton.Size = UDim2.new(0, 60, 0, 30)
-        keybindButton.Position = UDim2.new(0.6, 300, 0.5, -15) -- Слева от переключателя
+        keybindButton.Position = UDim2.new(0.6, 300, 0.5, -15)
         keybindButton.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
         keybindButton.BorderSizePixel = 0
         keybindButton.AutoButtonColor = false
@@ -1232,10 +1225,17 @@ local function createToggle(parent, setting, position)
         keybindText.ZIndex = keybindButton.ZIndex + 1
         keybindText.Parent = keybindButton
 
-        -- Устанавливаем изначальный текст
+        -- ИСПРАВЛЕНО: Устанавливаем изначальный текст правильно
         local savedBind = keybindSystem.savedBinds[setting.moduleName]
         if savedBind then
-            keybindText.Text = "[" .. getKeyName(Enum.KeyCode[savedBind]) .. "]"
+            -- Проверяем что keyCode существует
+            local keyCode = Enum.KeyCode[savedBind]
+            if keyCode then
+                keybindText.Text = "[" .. getKeyName(keyCode) .. "]"
+            else
+                keybindText.Text = "[None]"
+                keybindSystem.savedBinds[setting.moduleName] = nil
+            end
         else
             keybindText.Text = "[None]"
         end
@@ -1243,6 +1243,7 @@ local function createToggle(parent, setting, position)
         -- Обработчик клика на кнопку бинда
         keybindButton.MouseButton1Click:Connect(function()
             keybindText.Text = "[...]"
+            keybindText.TextColor3 = Color3.fromRGB(255, 75, 75)
             keybindSystem.listeningForBind = setting.moduleName
             keybindSystem.listeningCallback = function(keyName)
                 keybindText.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -1256,17 +1257,15 @@ local function createToggle(parent, setting, position)
                         end
                     end
                     keybindSystem.savedBinds[setting.moduleName] = nil
-                    saveKeybinds()
+                    saveSettings()  -- ИСПРАВЛЕНО: сохраняем через общую функцию
                 else
                     keybindText.Text = "[" .. keyName .. "]"
                 end
-                keybindSystem.listeningForBind = nil
-                keybindSystem.listeningCallback = nil
             end
         end)
     end
 
-    -- Переключатель перемещен вправо
+    -- Переключатель
     local switchTrack = Instance.new("Frame")
     switchTrack.Size = UDim2.new(0, 40, 0, 20)
     switchTrack.Position = UDim2.new(0.6, 390, 0.5, -10)
@@ -1333,20 +1332,6 @@ local function createToggle(parent, setting, position)
     setting._setToggleState = setToggleState
 
     return outerFrame
-end
-
-local function updateKeybindDisplay(moduleName, keybindButton)
-    if not keybindButton then return end
-    
-    local keybindText = keybindButton:FindFirstChild("TextLabel")
-    if not keybindText then return end
-    
-    local savedBind = keybindSystem.savedBinds[moduleName]
-    if savedBind then
-        keybindText.Text = "[" .. getKeyName(Enum.KeyCode[savedBind]) .. "]"
-    else
-        keybindText.Text = "[None]"
-    end
 end
 
 -- ДОБАВЛЕНО: Загружаем бинды при инициализации
