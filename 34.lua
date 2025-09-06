@@ -39,6 +39,13 @@ local ZINDEX = {
     TOGGLE_BUTTON = 1800      -- Кнопка переключения
 }
 
+local keybindSystem = {
+    binds = {}, -- {KeyCode = moduleName}
+    listeningForBind = nil,
+    listeningCallback = nil,
+    savedBinds = {} -- Сохраненные бинды
+}
+
 local API = {
     modules = {},
     settings = {},
@@ -93,13 +100,6 @@ local function applyModuleSettings(moduleName)
         end
     end
 end
-
-local keybindSystem = {
-    binds = {}, -- {KeyCode = moduleName}
-    listeningForBind = nil,
-    listeningCallback = nil,
-    savedBinds = {} -- Сохраненные бинды
-}
 
 -- Функция для получения имени клавиши
 local function getKeyName(keyCode)
