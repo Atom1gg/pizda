@@ -56,6 +56,13 @@ local API = {
     pendingCallbacks = {}   -- ДОБАВЛЕНО
 }
 
+local moduleSystem = {
+    activeCategory = nil,
+    activeModule = nil,
+    activeModuleName = nil,  -- ВАЖНО: Инициализируем эту переменную
+    modules = API.modules
+}
+
 -- Система сохранения настроек с папкой пользователя
 local function getPlayerDataPath()
     local playerName = player.Name
@@ -178,13 +185,18 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
                             pcall(module.callback, module.enabled)
                         end
                         
-                        -- ИСПРАВЛЕНО: Проверяем правильную переменную
-                        if moduleSystem.activeModuleName == moduleName and API.settings[moduleName] then
-                            local settings = API.settings[moduleName].settings
-                            for _, setting in ipairs(settings) do
-                                if setting.name == "Enabled" and setting._setToggleState then
-                                    setting._setToggleState(module.enabled)
-                                    break
+                        -- ИСПРАВЛЕНО: Убираем проблемную проверку activeModuleName
+                        -- Вместо этого ищем активный модуль через UI
+                        local settingsContainer = _G.mainFrame and _G.mainFrame:FindFirstChild("SettingsContainer")
+                        if settingsContainer and settingsContainer.BackgroundTransparency < 1 then
+                            -- Модуль открыт, обновляем UI
+                            if API.settings[moduleName] then
+                                local settings = API.settings[moduleName].settings
+                                for _, setting in ipairs(settings) do
+                                    if setting.name == "Enabled" and setting._setToggleState then
+                                        setting._setToggleState(module.enabled)
+                                        break
+                                    end
                                 end
                             end
                         end
@@ -546,14 +558,6 @@ function API:applyPendingCallbacks()
     end
     self.pendingCallbacks = {}
 end
-
-
-local moduleSystem = {
-    activeCategory = nil,
-    activeModule = nil,
-    activeModuleName = nil,
-    modules = API.modules
-}
 
 local moduleSettings = API.settings
 
@@ -1197,7 +1201,7 @@ local function createToggle(parent, setting, position)
     enableLabel.ZIndex = outerFrame.ZIndex + 1
     enableLabel.Parent = outerFrame
 
-    -- Кнопка бинда
+    -- ИСПРАВЛЕННАЯ кнопка бинда
     local keybindButton = nil
     local keybindText = nil
     local shouldHaveBind = setting.bind == true or (setting.name == "Enabled" and setting.bind ~= false)
@@ -1206,9 +1210,10 @@ local function createToggle(parent, setting, position)
         keybindButton = Instance.new("TextButton")
         keybindButton.Size = UDim2.new(0, 60, 0, 30)
         keybindButton.Position = UDim2.new(0.6, 300, 0.5, -15)
-        keybindButton.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
+        keybindButton.BackgroundColor3 = Color3.fromRGB(30, 30, 32)  -- ИСПРАВЛЕНО: Более темный фон
         keybindButton.BorderSizePixel = 0
         keybindButton.AutoButtonColor = false
+        keybindButton.Text = ""  -- ИСПРАВЛЕНО: Убираем текст из кнопки
         keybindButton.ZIndex = outerFrame.ZIndex + 1
         keybindButton.Parent = outerFrame
 
@@ -1216,44 +1221,67 @@ local function createToggle(parent, setting, position)
         keybindCorner.CornerRadius = UDim.new(0, 4)
         keybindCorner.Parent = keybindButton
 
+        -- ИСПРАВЛЕНО: Правильный TextLabel для отображения бинда
         keybindText = Instance.new("TextLabel")
         keybindText.Size = UDim2.new(1, -4, 1, -4)
         keybindText.Position = UDim2.new(0, 2, 0, 2)
         keybindText.BackgroundTransparency = 1
+        keybindText.Text = "[None]"  -- ИСПРАВЛЕНО: Изначальный текст
         keybindText.Font = Enum.Font.SourceSans
-        keybindText.TextSize = 19
+        keybindText.TextSize = 12
         keybindText.TextColor3 = Color3.fromRGB(200, 200, 200)
+        keybindText.TextXAlignment = Enum.TextXAlignment.Center
+        keybindText.TextYAlignment = Enum.TextYAlignment.Center
         keybindText.ZIndex = keybindButton.ZIndex + 1
         keybindText.Parent = keybindButton
 
-        -- ИСПРАВЛЕНО: Правильно отображаем сохраненный бинд
+        -- ИСПРАВЛЕНО: Функция обновления отображения бинда
         local function updateKeybindDisplay()
+            if not setting.moduleName then return end
+            
             local savedBind = keybindSystem.savedBinds[setting.moduleName]
             if savedBind then
                 local keyCode = Enum.KeyCode[savedBind]
                 if keyCode then
                     keybindText.Text = "[" .. getKeyName(keyCode) .. "]"
+                    keybindText.TextColor3 = Color3.fromRGB(255, 75, 75)  -- Красный если есть бинд
                 else
                     keybindText.Text = "[None]"
+                    keybindText.TextColor3 = Color3.fromRGB(200, 200, 200)
                     keybindSystem.savedBinds[setting.moduleName] = nil
                     saveSettings()
                 end
             else
                 keybindText.Text = "[None]"
+                keybindText.TextColor3 = Color3.fromRGB(200, 200, 200)
             end
         end
         
+        -- Сразу обновляем отображение
         updateKeybindDisplay()
+
+        -- Hover эффекты для кнопки бинда
+        keybindButton.MouseEnter:Connect(function()
+            TweenService:Create(keybindButton, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(40, 40, 42)
+            }):Play()
+        end)
+
+        keybindButton.MouseLeave:Connect(function()
+            TweenService:Create(keybindButton, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(30, 30, 32)
+            }):Play()
+        end)
 
         -- Обработчик клика на кнопку бинда
         keybindButton.MouseButton1Click:Connect(function()
-            keybindText.Text = "[...]"
-            keybindText.TextColor3 = Color3.fromRGB(255, 75, 75)
+            keybindText.Text = "[Press Key]"
+            keybindText.TextColor3 = Color3.fromRGB(255, 255, 75)  -- Желтый при ожидании
             keybindSystem.listeningForBind = setting.moduleName
             keybindSystem.listeningCallback = function(keyName)
-                keybindText.TextColor3 = Color3.fromRGB(200, 200, 200)
                 if keyName == "None" then
                     keybindText.Text = "[None]"
+                    keybindText.TextColor3 = Color3.fromRGB(200, 200, 200)
                     -- Убираем бинд
                     for keyCode, moduleName in pairs(keybindSystem.binds) do
                         if moduleName == setting.moduleName then
@@ -1265,15 +1293,16 @@ local function createToggle(parent, setting, position)
                     saveSettings()
                 else
                     keybindText.Text = "[" .. keyName .. "]"
+                    keybindText.TextColor3 = Color3.fromRGB(255, 75, 75)
                 end
             end
         end)
         
-        -- ДОБАВЛЯЕМ: Функцию для обновления отображения извне
+        -- Сохраняем функцию обновления для внешнего доступа
         setting._updateKeybindDisplay = updateKeybindDisplay
     end
 
-    -- Переключатель (остальная часть остается без изменений)
+    -- Переключатель
     local switchTrack = Instance.new("Frame")
     switchTrack.Size = UDim2.new(0, 40, 0, 20)
     switchTrack.Position = UDim2.new(0.6, 390, 0.5, -10)
@@ -1518,6 +1547,7 @@ local function createModuleButton(parent, moduleData)
     end)
 
     clickDetector.MouseButton1Click:Connect(function()
+        -- Сбрасываем другие кнопки
         for _, otherButton in pairs(parent:GetChildren()) do
             if otherButton:IsA("Frame") and otherButton ~= moduleButton then
                 local otherLine = otherButton:FindFirstChild("Frame")
@@ -1534,15 +1564,18 @@ local function createModuleButton(parent, moduleData)
             end
         end
 
+        -- Активируем текущую кнопку
         tweenColor(moduleButton, "BackgroundColor3", Color3.fromRGB(22, 28, 30))
         tweenColor(moduleName, "TextColor3", Color3.fromRGB(255, 75, 75))
         activeLine.Transparency = 0
         tweenSize(activeLine, "Size", UDim2.new(0, 2, 1, -20))
 
+        -- ИСПРАВЛЕНО: Устанавливаем activeModuleName
         slashLabel.Visible = true
         moduleNameLabel.Text = moduleData.name
         moduleNameLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
-        moduleSystem.activeModuleName = moduleData.name
+        moduleSystem.activeModuleName = moduleData.name  -- ВАЖНО: Устанавливаем переменную
+        
         showModuleSettings(moduleData.name)
     end)
 
