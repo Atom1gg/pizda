@@ -200,12 +200,6 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
                                 end
                             end
                         end
-                        
-                        showNotification(
-                            moduleName .. " " .. (module.enabled and "enabled" or "disabled"),
-                            module.enabled and "success" or "error",
-                            2
-                        )
                         return
                     end
                 end
