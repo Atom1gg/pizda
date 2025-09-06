@@ -1228,7 +1228,7 @@ local function createToggle(parent, setting, position)
         keybindText.BackgroundTransparency = 1
         keybindText.Text = "[None]"  -- ИСПРАВЛЕНО: Изначальный текст
         keybindText.Font = Enum.Font.SourceSans
-        keybindText.TextSize = 12
+        keybindText.TextSize = 19
         keybindText.TextColor3 = Color3.fromRGB(200, 200, 200)
         keybindText.TextXAlignment = Enum.TextXAlignment.Center
         keybindText.TextYAlignment = Enum.TextYAlignment.Center
