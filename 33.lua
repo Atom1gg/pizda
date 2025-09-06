@@ -57,11 +57,17 @@ end
 
 local function saveSettings()
     local success, err = pcall(function()
+        -- ИСПРАВЛЕНО: Убираем keybindSystem.savedBinds из основных настроек
         local dataToSave = {
             settings = API.savedSettings,
             moduleStates = API.savedModuleStates,
-            keybinds = keybindSystem.savedBinds  -- ДОБАВЛЕНО: сохраняем бинды
+            keybinds = {}  -- Создаем пустой объект для биндов
         }
+        
+        -- Правильно сохраняем бинды
+        for moduleName, keyCodeName in pairs(keybindSystem.savedBinds) do
+            dataToSave.keybinds[moduleName] = keyCodeName
+        end
         
         if not isfolder("Umbrella") then
             makefolder("Umbrella")
@@ -139,7 +145,7 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
             -- Устанавливаем новый бинд
             keybindSystem.binds[keyCode] = keybindSystem.listeningForBind
             keybindSystem.savedBinds[keybindSystem.listeningForBind] = keyCode.Name
-            saveKeybinds()
+            saveSettings()
             
             if keybindSystem.listeningCallback then
                 keybindSystem.listeningCallback(getKeyName(keyCode))
@@ -172,10 +178,9 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
                             pcall(module.callback, module.enabled)
                         end
                         
-                        -- ИСПРАВЛЕНО: Обновляем UI если модуль открыт
+                        -- ИСПРАВЛЕНО: Проверяем правильную переменную
                         if moduleSystem.activeModuleName == moduleName and API.settings[moduleName] then
                             local settings = API.settings[moduleName].settings
-                            -- Ищем настройку "Enabled"
                             for _, setting in ipairs(settings) do
                                 if setting.name == "Enabled" and setting._setToggleState then
                                     setting._setToggleState(module.enabled)
@@ -184,7 +189,6 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
                             end
                         end
                         
-                        -- Показываем нотификацию
                         showNotification(
                             moduleName .. " " .. (module.enabled and "enabled" or "disabled"),
                             module.enabled and "success" or "error",
@@ -197,6 +201,7 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
         end
     end
 end)
+
 
 local function loadSettings()
     local success, result = pcall(function()
@@ -503,23 +508,19 @@ function API:registerSettings(moduleName, settingsTable)
         end
     }
     
-    -- ИСПРАВЛЕНО: Пользовательские настройки идут первыми
-local allSettings = {enabledToggle} -- Enabled добавляется в начало
-for _, setting in ipairs(settingsTable) do
-    table.insert(allSettings, setting)
-end
+    local allSettings = {enabledToggle}
+    for _, setting in ipairs(settingsTable) do
+        table.insert(allSettings, setting)
+    end
     
     self.settings[moduleName] = {settings = allSettings}
     
-    -- ИСПРАВЛЕНО: Загружаем сохраненные значения БЕЗ вызова callback'ов
+    -- Загружаем сохраненные значения БЕЗ вызова callback'ов
     if self.savedSettings[moduleName] then
         for _, setting in ipairs(allSettings) do
             local savedValue = self.savedSettings[moduleName][setting.name]
             if savedValue ~= nil then
                 setting.default = savedValue
-                -- НЕ ВЫЗЫВАЕМ callback здесь сразу!
-                
-                -- ИСПРАВЛЕНО: Добавляем callback'и в очередь для применения после инициализации
                 if setting.callback then
                     table.insert(self.pendingCallbacks, function()
                         pcall(setting.callback, savedValue)
@@ -1196,7 +1197,7 @@ local function createToggle(parent, setting, position)
     enableLabel.ZIndex = outerFrame.ZIndex + 1
     enableLabel.Parent = outerFrame
 
-    -- Кнопка бинда (только если bind = true или для "Enabled")
+    -- Кнопка бинда
     local keybindButton = nil
     local keybindText = nil
     local shouldHaveBind = setting.bind == true or (setting.name == "Enabled" and setting.bind ~= false)
@@ -1225,20 +1226,24 @@ local function createToggle(parent, setting, position)
         keybindText.ZIndex = keybindButton.ZIndex + 1
         keybindText.Parent = keybindButton
 
-        -- ИСПРАВЛЕНО: Устанавливаем изначальный текст правильно
-        local savedBind = keybindSystem.savedBinds[setting.moduleName]
-        if savedBind then
-            -- Проверяем что keyCode существует
-            local keyCode = Enum.KeyCode[savedBind]
-            if keyCode then
-                keybindText.Text = "[" .. getKeyName(keyCode) .. "]"
+        -- ИСПРАВЛЕНО: Правильно отображаем сохраненный бинд
+        local function updateKeybindDisplay()
+            local savedBind = keybindSystem.savedBinds[setting.moduleName]
+            if savedBind then
+                local keyCode = Enum.KeyCode[savedBind]
+                if keyCode then
+                    keybindText.Text = "[" .. getKeyName(keyCode) .. "]"
+                else
+                    keybindText.Text = "[None]"
+                    keybindSystem.savedBinds[setting.moduleName] = nil
+                    saveSettings()
+                end
             else
                 keybindText.Text = "[None]"
-                keybindSystem.savedBinds[setting.moduleName] = nil
             end
-        else
-            keybindText.Text = "[None]"
         end
+        
+        updateKeybindDisplay()
 
         -- Обработчик клика на кнопку бинда
         keybindButton.MouseButton1Click:Connect(function()
@@ -1257,15 +1262,18 @@ local function createToggle(parent, setting, position)
                         end
                     end
                     keybindSystem.savedBinds[setting.moduleName] = nil
-                    saveSettings()  -- ИСПРАВЛЕНО: сохраняем через общую функцию
+                    saveSettings()
                 else
                     keybindText.Text = "[" .. keyName .. "]"
                 end
             end
         end)
+        
+        -- ДОБАВЛЯЕМ: Функцию для обновления отображения извне
+        setting._updateKeybindDisplay = updateKeybindDisplay
     end
 
-    -- Переключатель
+    -- Переключатель (остальная часть остается без изменений)
     local switchTrack = Instance.new("Frame")
     switchTrack.Size = UDim2.new(0, 40, 0, 20)
     switchTrack.Position = UDim2.new(0.6, 390, 0.5, -10)
@@ -1333,6 +1341,7 @@ local function createToggle(parent, setting, position)
 
     return outerFrame
 end
+
 
 -- ДОБАВЛЕНО: Загружаем бинды при инициализации
 local originalInit = init
@@ -1430,6 +1439,14 @@ local function showModuleSettings(moduleName)
         elseif setting.type == "button" then
             local button = createButton(container, setting, UDim2.new(0, 0, 0, yOffset))
             yOffset = yOffset + 5
+        end
+    end
+    
+    -- ДОБАВЛЕНО: Обновляем отображение биндов после создания UI
+    task.wait(0.1)
+    for _, setting in ipairs(settings.settings) do
+        if setting._updateKeybindDisplay then
+            setting._updateKeybindDisplay()
         end
     end
 end
