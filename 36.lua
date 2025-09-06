@@ -1244,7 +1244,6 @@ local function createToggle(parent, setting, position)
                 local keyCode = Enum.KeyCode[savedBind]
                 if keyCode then
                     keybindText.Text = "[" .. getKeyName(keyCode) .. "]"
-                    keybindText.TextColor3 = Color3.fromRGB(255, 75, 75)  -- Красный если есть бинд
                 else
                     keybindText.Text = "[None]"
                     keybindText.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -1275,8 +1274,7 @@ local function createToggle(parent, setting, position)
 
         -- Обработчик клика на кнопку бинда
         keybindButton.MouseButton1Click:Connect(function()
-            keybindText.Text = "[Press Key]"
-            keybindText.TextColor3 = Color3.fromRGB(255, 255, 75)  -- Желтый при ожидании
+            keybindText.Text = "[...]"
             keybindSystem.listeningForBind = setting.moduleName
             keybindSystem.listeningCallback = function(keyName)
                 if keyName == "None" then
